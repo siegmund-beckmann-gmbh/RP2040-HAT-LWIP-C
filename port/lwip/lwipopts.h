@@ -45,6 +45,8 @@
 #define LWIP_TCP 1
 #define MEM_SIZE 2048
 
+#define LWIP_DNS_SUPPORT_MDNS_QUERIES 1
+
 // disable ACD to avoid build errors
 // http://lwip.100.n7.nabble.com/Build-issue-if-LWIP-DHCP-is-set-to-0-td33280.html
 #define LWIP_DHCP_DOES_ACD_CHECK 0
@@ -72,7 +74,8 @@
 #define IP_DEBUG LWIP_DBG_OFF
 #define TCPIP_DEBUG LWIP_DBG_OFF
 #define DHCP_DEBUG LWIP_DBG_OFF
-#define UDP_DEBUG LWIP_DBG_OFF
+#define UDP_DEBUG LWIP_DBG_ON
+#define DNS_DEBUG LWIP_DBG_ON
 #endif
 
 #endif /* __LWIPOPTS_H__ */

@@ -53,9 +53,14 @@ extern uint8_t mac[6];
 struct netif g_netif;
 
 /* DNS */
-static uint8_t g_dns_target_domain[] = "www.wiznet.io";
+static uint8_t g_dns_target_domain[] = "_postgresql._tcp.local";
 static uint8_t g_dns_get_ip_flag = 0;
 static uint32_t g_ip;
+
+static ip_addr_t default_ip;
+static ip_addr_t default_mask;
+static ip_addr_t default_gateway;
+
 static ip_addr_t g_resolved;
 
 /**
@@ -78,13 +83,21 @@ int main()
     uint8_t *pack = malloc(ETHERNET_MTU);
     uint16_t pack_len = 0;
     struct pbuf *p = NULL;
+    err_t status = ERR_VAL;
+    err_t old_status = ERR_OK;
+
+    // Initialize network configuration
+    IP4_ADDR(&default_ip, 192, 168, 0, 80);
+    IP4_ADDR(&default_mask, 255, 255, 255, 0);
+    IP4_ADDR(&default_gateway, 192, 168, 0, 1);
 
     set_clock_khz();
 
     // Initialize stdio after the clock change
     stdio_init_all();
+    printf("starting up...\n",status);
 
-    sleep_ms(1000 * 3); // wait for 3 seconds
+    sleep_ms(1000 * 3); // wait for 2 seconds
 
     wizchip_spi_initialize();
     wizchip_cris_initialize();
@@ -100,7 +113,8 @@ int main()
     // Initialize LWIP in NO_SYS mode
     lwip_init();
 
-    netif_add(&g_netif, IP4_ADDR_ANY, IP4_ADDR_ANY, IP4_ADDR_ANY, NULL, netif_initialize, netif_input);
+    // netif_add(&g_netif, IP4_ADDR_ANY, IP4_ADDR_ANY, IP4_ADDR_ANY, NULL, netif_initialize, netif_input);
+    netif_add(&g_netif, &default_ip, &default_mask, &default_gateway, NULL, netif_initialize, netif_input);
     g_netif.name[0] = 'e';
     g_netif.name[1] = '0';
 
@@ -159,15 +173,26 @@ int main()
             }
         }
 
-        if ((dns_gethostbyname(g_dns_target_domain, &g_resolved, NULL, NULL) == ERR_OK) && (g_dns_get_ip_flag == 0))
-        {
-            g_ip = g_resolved.addr;
+        if (g_dns_get_ip_flag == 0) {            
 
-            printf(" DNS success\n");
-            printf(" Target domain : %s\n", g_dns_target_domain);
-            printf(" IP of target domain : [%03d.%03d.%03d.%03d]\n", g_ip & 0xFF, (g_ip >> 8) & 0xFF, (g_ip >> 16) & 0xFF, (g_ip >> 24) & 0xFF);
+            status = dns_gethostbyname(g_dns_target_domain, &g_resolved, NULL, NULL);
 
-            g_dns_get_ip_flag = 1;
+            if (status == ERR_OK)
+            {
+                g_ip = g_resolved.addr;
+
+                printf(" DNS success\n");
+                printf(" Target domain : %s\n", g_dns_target_domain);
+                printf(" IP of target domain : [%03d.%03d.%03d.%03d]\n", g_ip & 0xFF, (g_ip >> 8) & 0xFF, (g_ip >> 16) & 0xFF, (g_ip >> 24) & 0xFF);
+
+                g_dns_get_ip_flag = 1;
+            }
+            else 
+            {
+                if (old_status != status) printf("dns status=%d\n",status);                
+            }
+
+            old_status = status;
         }
 
         /* Cyclic lwIP timers check */

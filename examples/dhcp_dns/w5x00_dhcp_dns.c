@@ -54,7 +54,7 @@ struct netif g_netif;
 
 /* DNS */
 static uint8_t g_dns_target_domain[] = "_postgresql._tcp.local";
-static uint8_t g_dns_get_ip_flag = 0;
+static uint8_t g_dns_get_ip_flag = 1;
 static uint32_t g_ip;
 
 static ip_addr_t default_ip;
@@ -70,6 +70,7 @@ static ip_addr_t g_resolved;
  */
 /* Clock */
 static void set_clock_khz(void);
+static void my_netif_status_callback(struct netif *netif);
 
 /**
  * ----------------------------------------------------------------------------------------------------
@@ -97,7 +98,7 @@ int main()
     stdio_init_all();
     printf("starting up...\n",status);
 
-    sleep_ms(1000 * 3); // wait for 2 seconds
+    sleep_ms(100); // wait a while
 
     wizchip_spi_initialize();
     wizchip_cris_initialize();
@@ -120,7 +121,7 @@ int main()
 
     // Assign callbacks for link and status
     netif_set_link_callback(&g_netif, netif_link_callback);
-    netif_set_status_callback(&g_netif, netif_status_callback);
+    netif_set_status_callback(&g_netif, my_netif_status_callback);
 
     // MACRAW socket open
     retval = socket(SOCKET_MACRAW, Sn_MR_MACRAW, PORT_LWIPERF, 0x00);
@@ -187,10 +188,6 @@ int main()
 
                 g_dns_get_ip_flag = 1;
             }
-            else 
-            {
-                if (old_status != status) printf("dns status=%d\n",status);                
-            }
 
             old_status = status;
         }
@@ -219,4 +216,13 @@ static void set_clock_khz(void)
         PLL_SYS_KHZ * 1000,                               // Input frequency
         PLL_SYS_KHZ * 1000                                // Output (must be same as no divider)
     );
+}
+
+/// @brief 
+/// @param netif 
+void my_netif_status_callback(struct netif *netif)
+{
+    printf("netif status changed %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
+
+    g_dns_get_ip_flag=0;
 }

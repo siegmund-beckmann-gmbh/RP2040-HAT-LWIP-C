@@ -43,7 +43,7 @@
 #define LWIP_ICMP 1
 #define LWIP_UDP 1
 #define LWIP_TCP 1
-#define MEM_SIZE 2048
+#define MEM_SIZE 1024*16
 
 #define LWIP_DNS_SUPPORT_MDNS_QUERIES 1
 

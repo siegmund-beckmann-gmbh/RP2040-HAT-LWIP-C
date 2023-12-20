@@ -32,12 +32,11 @@
 #include "timer.h"
 
 #include "pico/stdlib.h"
-#include "hardware/pio.h"
-#include "uart_tx9.pio.h"
-#include "uart_rx9.pio.h"
 #include "pico/util/queue.h"
 
 #include "hardware/flash.h"
+
+#include "mdb.h"
 
 /**
  * ----------------------------------------------------------------------------------------------------
@@ -78,34 +77,8 @@ static ip_addr_t g_resolved;
 /* Timer */
 static volatile uint16_t mdb_msec_cnt = 0;
 
-const uint MDB_PIN_TX = 4;
-const uint MDB_PIN_RX = 5;
-const uint MDB_SERIAL_BAUD = 9600;
-
-#define FIFO_SIZE 64
-
-static PIO pio = pio0;
-static int8_t pio_irq;
-static uint smtx = 0;
-static uint smrx = 1;
-static queue_t fifo;
-
-static bool data_available = false;
-
-// IRQ called when the pio fifo is not empty, i.e. there are some characters on the uart
-// This needs to run as quickly as possible or else you will lose characters (in particular don't printf!)
-static void pio_irq_func(void) {
-    while(!pio_sm_is_rx_fifo_empty(pio, smrx)) {
-        uint16_t c = uart_rx_program_getc(pio, smrx);
-        if (!queue_try_add(&fifo, &c)) {
-            printf("fifo full");
-        }
-    }
-    // Tell the async worker that there are some characters waiting for us
-    // async_context_set_work_pending(&async_context.core, &worker);
-    data_available = true;
-
-}
+/* MDB */
+extern queue_t MDBfifo;
 
 /**
  * ----------------------------------------------------------------------------------------------------
@@ -143,30 +116,9 @@ int main()
     // Initialize stdio after the clock change
     stdio_init_all();
 
-    uint txoffset = pio_add_program(pio, &uart_tx_program);
-    uart_tx_program_init(pio, smtx, txoffset, MDB_PIN_TX, MDB_SERIAL_BAUD);
-    uint rxoffset = pio_add_program(pio, &uart_rx_program);
-    uart_rx_program_init(pio, smrx, rxoffset, MDB_PIN_RX, MDB_SERIAL_BAUD);
-
-// Find a free irq
-    static_assert(PIO0_IRQ_1 == PIO0_IRQ_0 + 1 && PIO1_IRQ_1 == PIO1_IRQ_0 + 1, "");
-    pio_irq = (pio == pio0) ? PIO0_IRQ_0 : PIO1_IRQ_0;
-    if (irq_get_exclusive_handler(pio_irq)) {
-        pio_irq++;
-        if (irq_get_exclusive_handler(pio_irq)) {
-            panic("All IRQs are in use");
-        }
-    }
-
-    queue_init(&fifo, 2, FIFO_SIZE);    
-
-    // Enable interrupt
-    irq_add_shared_handler(pio_irq, pio_irq_func, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY); // Add a shared IRQ handler
-    irq_set_enabled(pio_irq, true); // Enable the IRQ
-    const uint irq_index = pio_irq - ((pio == pio0) ? PIO0_IRQ_0 : PIO1_IRQ_0); // Get index of the IRQ
-    pio_set_irqn_source_enabled(pio, irq_index, pis_sm0_rx_fifo_not_empty + smrx, true); // Set pio to tell us when the FIFO is NOT empty
-
     wizchip_1ms_timer_initialize(repeating_timer_callback);
+
+    InitMDB();
     
     printf("starting up...\n",status);
 
@@ -268,19 +220,14 @@ int main()
 
         /* Cyclic lwIP timers check */
         sys_check_timeouts();
-
-        if (data_available) {
-            while(!queue_is_empty(&fifo)) {
-                uint16_t c;
-                if (!queue_try_remove(&fifo, &c)) {
-                    printf("fifo empty");
-                }
-                printf("%03X ", c); // Display character in the console
-            }
-
-            data_available=false;
-        }
-
+        
+        while(!queue_is_empty(&MDBfifo)) {
+            uint16_t c;
+            if (!queue_try_remove(&MDBfifo, &c)) {
+                printf("fifo empty");
+            }                
+            printf("%03X ", c); // Display character in the console
+        }        
     }
 }
 
@@ -316,18 +263,6 @@ void my_netif_status_callback(struct netif *netif)
 
 /* Timer */
 static void repeating_timer_callback(void)
-{    
-    mdb_msec_cnt++;
-
-    if (mdb_msec_cnt >= 99) 
-    {
-        mdb_msec_cnt = 0;                
-        // MDB-Zyklus
-
-        if(g_dns_get_ip_flag) 
-        {
-            uart_tx_program_putc(pio, smtx, 0x10b);
-            uart_tx_program_putc(pio, smtx, 0x00b);    
-        }
-    }
+{            
+    if(g_dns_get_ip_flag) handleMDBtimer();
 }

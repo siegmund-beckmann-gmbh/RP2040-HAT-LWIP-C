@@ -5,6 +5,7 @@ set(TARGET_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/postgresql.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/md5.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/hexdump.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/mdb.c
     )
 
 add_executable(${TARGET_NAME} ${TARGET_FILES})
@@ -26,6 +27,7 @@ pico_generate_pio_header(${TARGET_NAME} ${CMAKE_CURRENT_LIST_DIR}/sql_client/uar
 
 target_link_libraries(${TARGET_NAME} PRIVATE
         pico_stdlib
+        pico_util
         hardware_spi
         hardware_dma
         hardware_pio

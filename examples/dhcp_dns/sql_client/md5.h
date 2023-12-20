@@ -24,6 +24,7 @@ documentation and/or software.
  */
 
 #include <string.h>
+#include <stddef.h>
 
 typedef unsigned long int UINT4;
 

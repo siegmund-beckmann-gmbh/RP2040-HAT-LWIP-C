@@ -25,6 +25,29 @@
 #define MAXBILLS 16
 #define MAX_PRIORITY 8
 
+enum event_types{
+	EvTypeMDB_ChangerReady =1 ,
+	EvTypeMDB_ChangerStatus,
+	EvTypeMDB_CoinInCashbox,
+	EvTypeMDB_CoinInTube,
+	EvTypeMDB_CoinRejected,
+	EvTypeMDB_CoinDispensedManually,
+	EvTypeMDB_TubesNewFillStatus,
+	EvTypeMDB_BillStackedManually,
+	EvTypeMDB_ValidatorStatus,
+	EvTypeMDB_BillInEscrow,
+	EvTypeMDB_BillStacked,
+	EvTypeMDB_BillReturned,
+	EvTypeMDB_BillRejected,
+	EvTypeMDB_BillEscrowTimeout
+};
+
+typedef struct __attribute__((packed)) MDBevent{
+	unsigned int  Type;
+	unsigned int  Length;
+	unsigned char Data[60];
+}MDB_EVENT;
+
 typedef struct HOPPERtag{	//20
 	unsigned int  Val;
 	unsigned int  Fill;
@@ -572,6 +595,8 @@ void SetAKZmax(unsigned long pay, unsigned char changemode);
 
 void CheckHopperFill();
 void CheckCoinToMain();
+
+void putMDBevent(MDB_EVENT *event);
 
 #endif /* MDB_H */
 // -----------------------------------------------------------------------------------

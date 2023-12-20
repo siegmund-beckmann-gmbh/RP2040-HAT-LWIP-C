@@ -222,11 +222,33 @@ int main()
         sys_check_timeouts();
         
         while(!queue_is_empty(&MDBfifo)) {
-            uint16_t c;
-            if (!queue_try_remove(&MDBfifo, &c)) {
+            MDB_EVENT ev;
+            unsigned int coinval;
+
+            if (!queue_try_remove(&MDBfifo, &ev)) {
                 printf("fifo empty");
-            }                
-            printf("%03X ", c); // Display character in the console
+            }   
+
+            switch (ev.Type)
+            {
+            case EvTypeMDB_ChangerReady:
+                printf("Enabling coins...\n");
+                EnableCoins(0xFFFF);
+                break;
+            case EvTypeMDB_ChangerStatus:
+                printf("Changer %02X Status %02X\n", ev.Data[0],ev.Data[1]); // Display character in the console
+                break;
+            
+            case EvTypeMDB_CoinInTube:
+                coinval=(ev.Data[0] + ev.Data[1]*256);
+                printf("Coin %d in Tube - channel %d \n",coinval,ev.Data[2]);
+                break;
+            default:
+                printf("MDB Event %d Length %d\n", ev.Type, ev.Length);
+                break;
+            }
+
+            
         }        
     }
 }

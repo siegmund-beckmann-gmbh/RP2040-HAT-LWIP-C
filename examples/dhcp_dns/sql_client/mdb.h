@@ -26,8 +26,14 @@
 #define MAX_PRIORITY 8
 
 enum event_types{
-	EvTypeMDB_ChangerReady =1 ,
+	EvTypeMDB_NAK = 1,
+	EvTypeMDB_ChangerReady,
 	EvTypeMDB_ChangerStatus,
+	EvTypeMDB_ChangerTubeStatusChanged,
+	EvTypeMDB_ChangerProblem,
+	EvTypeMDB_ChangerLost,
+	EvTypeMDB_ChangerDispenseInfo,
+	EvTypeMDB_ChangerExpandedPayout,
 	EvTypeMDB_CoinInCashbox,
 	EvTypeMDB_CoinInTube,
 	EvTypeMDB_CoinRejected,
@@ -35,11 +41,31 @@ enum event_types{
 	EvTypeMDB_TubesNewFillStatus,
 	EvTypeMDB_BillStackedManually,
 	EvTypeMDB_ValidatorStatus,
+	EvTypeMDB_ValidatorLost,
 	EvTypeMDB_BillInEscrow,
 	EvTypeMDB_BillStacked,
 	EvTypeMDB_BillReturned,
 	EvTypeMDB_BillRejected,
-	EvTypeMDB_BillEscrowTimeout
+	EvTypeMDB_BillEscrowTimeout,
+	EvTypeMDB_HopperInserted,
+	EvTypeMDB_HopperStatusChanged,
+	EvTypeMDB_HopperCounted,
+	EvTypeMDB_HopperTimeout,
+	EvTypeMDB_HopperPaidOut,
+	EvTypeMDB_HopperRemoved,
+	EvTypeMDB_CardreaderReady,
+	EvTypeMDB_CardreaderError,
+	EvTypeMDB_CardreaderLost,
+	EvTypeMDB_CardreaderDisplay,
+	EvTypeMDB_CardreaderFunds,
+	EvTypeMDB_CardreaderVendApproved,
+	EvTypeMDB_CardreaderVendDenied,
+	EvTypeMDB_CardreaderAgeVerificationStatus,
+	EvTypeMDB_EmpLost,
+	EvTypeMDB_EmpStatus,
+	EvTypeMDB_EmpCoinInserted,
+	EvTypeMDB_AVDLost,
+	EvTypeMDB_ParkIOLost
 };
 
 typedef struct __attribute__((packed)) MDBevent{

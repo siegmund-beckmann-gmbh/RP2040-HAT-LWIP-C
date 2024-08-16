@@ -13,8 +13,8 @@
 #define FIFO_SIZE 32
 queue_t MDBfifo;
 
-const uint MDB_PIN_TX = 4;
-const uint MDB_PIN_RX = 5;
+const uint MDB_PIN_TX = 2;
+const uint MDB_PIN_RX = 3;
 const uint MDB_SERIAL_BAUD = 9600;
 
 static PIO pio = pio0;
@@ -376,8 +376,8 @@ void InitValidator()
 
 	MDB_Validator.DevLost=0;
 	
-	MDB_Validator.LastRequest=CmdValidator_Reset;
-	MDB_Validator.NextRequest=CmdValidator_Reset;
+	MDB_Validator.LastRequest=CmdValidator_Poll;
+	MDB_Validator.NextRequest=CmdValidator_Poll;
 	MDB_Validator.NewRequest=0;
 	MDB_Validator.NewSequence=0;
 	MDB_Validator.ResetTime=2000;
@@ -1094,11 +1094,13 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 				else SysVar.Tube[h].avail=1;
 			}						
 		}
-						
-		MDBEvent.Type    = EvTypeMDB_ChangerTubeStatusChanged;
-		MDBEvent.Length  = 1;
-		MDBEvent.Data[0] = diff;
-		putMDBevent(&MDBEvent);
+
+		if (diff) 
+		{
+			MDBEvent.Type    = EvTypeMDB_ChangerTubeStatusChanged;
+			MDBEvent.Length  = 0;
+			putMDBevent(&MDBEvent);
+		}
 		
 	  }	  
 #endif

@@ -29,7 +29,7 @@
  * Variables
  * ----------------------------------------------------------------------------------------------------
  */
-uint8_t mac[6] = {0x00, 0x08, 0xDC, 0x12, 0x34, 0x56};
+uint8_t mac[6] = {0x00, 0x08, 0xDC, 0x34, 0x56, 0x78};
 
 static uint8_t tx_frame[1542];
 static const uint32_t ethernet_polynomial_le = 0xedb88320U;

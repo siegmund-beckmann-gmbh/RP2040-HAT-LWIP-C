@@ -33,10 +33,13 @@
 
 #include "pico/stdlib.h"
 #include "pico/util/queue.h"
+#include "pico/unique_id.h"
 
 #include "hardware/flash.h"
 
 #include "mdb.h"
+#include "hexdump.h"
+#include "illumination.h"
 
 /**
  * ----------------------------------------------------------------------------------------------------
@@ -57,8 +60,10 @@
  * Variables
  * ----------------------------------------------------------------------------------------------------
  */
+
 /* Network */
 extern uint8_t mac[6];
+pico_unique_board_id_t SystemID;
 
 /* LWIP */
 struct netif g_netif;
@@ -75,7 +80,10 @@ static ip_addr_t default_gateway;
 static ip_addr_t g_resolved;
 
 /* Timer */
-static volatile uint16_t mdb_msec_cnt = 0;
+static volatile uint16_t msec_cnt = 0;
+static volatile uint16_t dht_cnt = 0;
+
+static uint8_t get_frontRGB = 0;
 
 /* MDB */
 extern queue_t MDBfifo;
@@ -116,11 +124,16 @@ int main()
     // Initialize stdio after the clock change
     stdio_init_all();
 
+    IlluminationInit();
+
+    pico_get_unique_board_id(&SystemID);    
+
     wizchip_1ms_timer_initialize(repeating_timer_callback);
 
     InitMDB();
     
-    printf("starting up...\n",status);
+    printf("starting up...\nSystemID =",status);
+    hexdump(&SystemID,sizeof(SystemID),8,8);    
 
     sleep_ms(100); // wait a while
 
@@ -164,7 +177,7 @@ int main()
     dhcp_start(&g_netif);
 
     dns_init();
-    
+        
     /* Infinite loop */
     while (1)
     {
@@ -234,6 +247,9 @@ int main()
             case EvTypeMDB_ChangerReady:
                 printf("Enabling coins...\n");
                 EnableCoins(0xFFFF);
+                IlluminateCoinInsert(1);
+                IlluminateBillInsert(1);
+                IlluminateCardInsert(1);
                 break;
             case EvTypeMDB_ChangerStatus:
                 printf("Changer %02X Status %02X\n", ev.Data[0],ev.Data[1]); // Display character in the console
@@ -243,13 +259,21 @@ int main()
                 coinval=(ev.Data[0] + ev.Data[1]*256);
                 printf("Coin %d in Tube - channel %d \n",coinval,ev.Data[2]);
                 break;
+
             default:
                 printf("MDB Event %d Length %d\n", ev.Type, ev.Length);
                 break;
             }
 
             
-        }        
+        }   
+        
+        if (get_frontRGB) {
+            get_frontRGB = 0;
+            ScanFRONTRGB(0);
+            ScanFRONTRGB(1);
+            ScanFRONTRGB(2);
+        }
     }
 }
 
@@ -287,4 +311,17 @@ void my_netif_status_callback(struct netif *netif)
 static void repeating_timer_callback(void)
 {            
     if(g_dns_get_ip_flag) handleMDBtimer();
+
+    /*
+    if (msec_cnt  == 4) ScanFRONTRGB(0);
+    if (msec_cnt  == 8) ScanFRONTRGB(1);
+    if (msec_cnt  ==12) ScanFRONTRGB(2);
+    */    
+
+   if (++msec_cnt > 19) {
+    msec_cnt=0;
+    get_frontRGB = 1;
+   }
+
 }
+

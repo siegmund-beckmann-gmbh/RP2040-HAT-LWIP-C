@@ -286,33 +286,33 @@ typedef union
         
 
 typedef struct 
-        {
-    	unsigned char TMPStatus[34];
-		unsigned char Status,DevLost,Level,Scaling,Decimals,NonResponseTime,MiscOptions,ErrorCode;
-		unsigned int  LastRequest,NextRequest,Sequence,ResetTime,DisplayCount,NewRequest;
-		unsigned long FeatureEnable,OptionalFeatures;
-		unsigned char PaymentType,PaymentData[2],UserLanguage[2],UserCurrencyCode[2],UserCardOptions;
-		unsigned int  ItemNumber,CountryCode;
-	
-		unsigned long ItemPrice,RevalueAmount,RevalueLimitAmount,VendAmount,FundsAvailable;
-		unsigned long DispFundsAvailable,NonResponseCount;
-		longdef       PaymentMediaID;
-		unsigned char DisplayTime,DisplayData[34];
-		unsigned char Manufacturer[4];	//incl Null
-		unsigned char Serial[13];  	//incl Null
-		unsigned char Model[13];  	//incl Null
-		unsigned int  Version;
-		unsigned char DataEntryLenRep;
-		unsigned char ready;
-		unsigned char Inhibit,Inhibit_Old;
-		unsigned char DRAV[6];  	//incl Null
-		unsigned char AVSFeature1,AVSFeature2,DiagnosticCommand,AVSConfiguration;
-		}CardreaderTag;
+{
+	unsigned char TMPStatus[34];
+	unsigned char Status,DevLost,Level,Scaling,Decimals,NonResponseTime,MiscOptions,ErrorCode;
+	unsigned int  LastRequest,NextRequest,Sequence,ResetTime,DisplayCount,NewRequest;
+	unsigned long FeatureEnable,OptionalFeatures;
+	unsigned char PaymentType,PaymentData[2],UserLanguage[2],UserCurrencyCode[2],UserCardOptions;
+	unsigned int  ItemNumber,CountryCode;
+
+	unsigned long ItemPrice,RevalueAmount,RevalueLimitAmount,VendAmount,FundsAvailable;
+	unsigned long DispFundsAvailable,NonResponseCount;
+	longdef       PaymentMediaID;
+	unsigned char DisplayTime,DisplayData[34];
+	unsigned char Manufacturer[4];	//incl Null
+	unsigned char Serial[13];  	//incl Null
+	unsigned char Model[13];  	//incl Null
+	unsigned int  Version;
+	unsigned char DataEntryLenRep;
+	unsigned char ready;
+	unsigned char Inhibit,Inhibit_Old;
+	unsigned char DRAV[6];  	//incl Null
+	unsigned char AVSFeature1,AVSFeature2,DiagnosticCommand,AVSConfiguration;
+}CardreaderTag;
 
 //-----------------------BillValidator---------------------
 typedef struct 
-        {
-        unsigned int  accepted;
+{
+    unsigned int  accepted;
 	unsigned char Level,Decimals,Escrow,EscrowStatus,StackerStatus;
 	unsigned int  Currency;
 	unsigned int  BillScaling;
@@ -334,46 +334,46 @@ typedef struct
 	unsigned long NoteValue,LastValue;
 	unsigned char Inhibit,Inhibited;
 	unsigned char ready,EscrowChannel;
-	}ValidatorTag;
+}ValidatorTag;
 
 //-----------------------Age Verification Device------------------------
 
 typedef struct 
-        {
-		unsigned char Status,DevLost,Level,NonResponseTime,MiscOptions,ErrorCode;
-		unsigned int  LastRequest,NextRequest,ResetTime,NewRequest;	
-		unsigned long NonResponseCount;
-		unsigned char Manufacturer[4];	//incl Null
-		unsigned char Serial[13];  	//incl Null
-		unsigned char Model[13];  	//incl Null
-		unsigned int  Version;
-		unsigned char ready;
-		unsigned char DRAV[6];  	//incl Null
-		unsigned char AVSFeature1,AVSFeature2,DiagnosticCommand,AVSConfiguration;
-		}AVDTag;
+{
+	unsigned char Status,DevLost,Level,NonResponseTime,MiscOptions,ErrorCode;
+	unsigned int  LastRequest,NextRequest,ResetTime,NewRequest;	
+	unsigned long NonResponseCount;
+	unsigned char Manufacturer[4];	//incl Null
+	unsigned char Serial[13];  	//incl Null
+	unsigned char Model[13];  	//incl Null
+	unsigned int  Version;
+	unsigned char ready;
+	unsigned char DRAV[6];  	//incl Null
+	unsigned char AVSFeature1,AVSFeature2,DiagnosticCommand,AVSConfiguration;
+}AVDTag;
 
 //-----------------------ParkIO Device------------------------
 
 typedef struct 
-        {
-		unsigned char DevLost,Level,NonResponseTime,MiscOptions,ErrorCode;
-		unsigned int  LastRequest,NextRequest,ResetTime,NewRequest;	
-		unsigned long NonResponseCount;
-		unsigned char Manufacturer[4];	//incl Null
-		unsigned char Serial[13];  	//incl Null
-		unsigned char Model[13];  	//incl Null
-		unsigned int  Version;
-		unsigned char ready,ResetFlag,Tidx,Hidx;		
-		unsigned char Status[16];
-				 int  Temp, HiTemp,LoTemp;
-			     int  TempArray[8];				 
-		unsigned int  Humidity;
-		unsigned int  HumidityArray[8];
-		         long Weight;		
-		unsigned char RelaisStat,InputStat;
-		unsigned char InputPulse[4];
-		unsigned char Scaling,Tara;
-		}PARKIOTag;
+{
+	unsigned char DevLost,Level,NonResponseTime,MiscOptions,ErrorCode;
+	unsigned int  LastRequest,NextRequest,ResetTime,NewRequest;	
+	unsigned long NonResponseCount;
+	unsigned char Manufacturer[4];	//incl Null
+	unsigned char Serial[13];  	//incl Null
+	unsigned char Model[13];  	//incl Null
+	unsigned int  Version;
+	unsigned char ready,ResetFlag,Tidx,Hidx;		
+	unsigned char Status[16];
+				int  Temp, HiTemp,LoTemp;
+				int  TempArray[8];				 
+	unsigned int  Humidity;
+	unsigned int  HumidityArray[8];
+				long Weight;		
+	unsigned char RelaisStat,InputStat;
+	unsigned char InputPulse[4];
+	unsigned char Scaling,Tara;
+}PARKIOTag;
 
 //*******************CONSTANTS**************************
 #define MDB_reload  					40		//40ms

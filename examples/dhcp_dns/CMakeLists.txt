@@ -6,6 +6,7 @@ set(TARGET_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/md5.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/hexdump.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/mdb.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/illumination.c
     )
 
 add_executable(${TARGET_NAME} ${TARGET_FILES})
@@ -32,6 +33,7 @@ target_link_libraries(${TARGET_NAME} PRIVATE
         hardware_dma
         hardware_pio
         hardware_flash
+        hardware_i2c
         ETHERNET_FILES
         IOLIBRARY_FILES
         LWIP_FILES

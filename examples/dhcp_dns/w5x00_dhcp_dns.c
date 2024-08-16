@@ -83,7 +83,18 @@ static ip_addr_t g_resolved;
 static volatile uint16_t msec_cnt = 0;
 static volatile uint16_t dht_cnt = 0;
 
-static uint8_t get_frontRGB = 0;
+static struct repeating_timer my_timer;
+void (*my_callback_ptr)(void);
+
+static void repeating_timer_1ms_callback(void);
+static void repeating_timer_20ms_callback(void);
+
+bool my_20ms_timer_callback(struct repeating_timer *t);
+
+/* Clock */
+static void set_clock_khz(void);
+static void my_netif_status_callback(struct netif *netif);
+
 
 /* MDB */
 extern queue_t MDBfifo;
@@ -93,11 +104,21 @@ extern queue_t MDBfifo;
  * Functions
  * ----------------------------------------------------------------------------------------------------
  */
-/* Clock */
-static void set_clock_khz(void);
-static void my_netif_status_callback(struct netif *netif);
+
 /* Timer */
-static void repeating_timer_callback(void);
+void my_20ms_timer_initialize(void (*callback)(void))
+{
+    my_callback_ptr = callback;
+    add_repeating_timer_us(-20000, my_20ms_timer_callback, NULL, &my_timer);
+}
+
+bool my_20ms_timer_callback(struct repeating_timer *t)
+{
+    if (my_callback_ptr != NULL)
+    {
+        my_callback_ptr();
+    }
+}
 
 /**
  * ----------------------------------------------------------------------------------------------------
@@ -127,8 +148,10 @@ int main()
     IlluminationInit();
 
     pico_get_unique_board_id(&SystemID);    
+    
+    my_20ms_timer_initialize(repeating_timer_20ms_callback);
 
-    wizchip_1ms_timer_initialize(repeating_timer_callback);
+    wizchip_1ms_timer_initialize(repeating_timer_1ms_callback);
 
     InitMDB();
     
@@ -247,7 +270,7 @@ int main()
             case EvTypeMDB_ChangerReady:
                 printf("Enabling coins...\n");
                 EnableCoins(0xFFFF);
-                IlluminateCoinInsert(1);
+                IlluminateCoinInsert(1);                
                 IlluminateBillInsert(1);
                 IlluminateCardInsert(1);
                 break;
@@ -260,20 +283,17 @@ int main()
                 printf("Coin %d in Tube - channel %d \n",coinval,ev.Data[2]);
                 break;
 
+            case EvTypeMDB_ChangerLost:
+                printf("Changer %02X lost\n", ev.Data[0]);
+                break;
+
             default:
                 printf("MDB Event %d Length %d\n", ev.Type, ev.Length);
                 break;
             }
 
             
-        }   
-        
-        if (get_frontRGB) {
-            get_frontRGB = 0;
-            ScanFRONTRGB(0);
-            ScanFRONTRGB(1);
-            ScanFRONTRGB(2);
-        }
+        }           
     }
 }
 
@@ -308,20 +328,22 @@ void my_netif_status_callback(struct netif *netif)
 }
 
 /* Timer */
-static void repeating_timer_callback(void)
+static void repeating_timer_1ms_callback(void)
 {            
     if(g_dns_get_ip_flag) handleMDBtimer();
 
-    /*
-    if (msec_cnt  == 4) ScanFRONTRGB(0);
-    if (msec_cnt  == 8) ScanFRONTRGB(1);
-    if (msec_cnt  ==12) ScanFRONTRGB(2);
-    */    
-
-   if (++msec_cnt > 19) {
-    msec_cnt=0;
-    get_frontRGB = 1;
-   }
-
+    if (++msec_cnt > 19) {
+        msec_cnt=0;
+        //get_frontRGB = 1;
+    }
 }
 
+
+static void repeating_timer_20ms_callback(void)
+{   
+    ScanFRONTRGB(0);             
+    ScanFRONTRGB(1);
+    ScanFRONTRGB(2);
+    writeIllum();
+    
+}

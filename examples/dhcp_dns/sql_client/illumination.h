@@ -19,9 +19,9 @@
                                                             //     i2c1 geht: 2, 6, 10, 14, 18, 22, 26
 #define PIN_SCL 27                                          // SCL-pin immer eine Nummer höher als SDA, also 1, 3, 5,...
 
-#define SAA1064_0	0x70
-#define SAA1064_1	0x72
-#define SAA1064_2	0x74
+#define SAA1064_0	0x38 //0x70
+#define SAA1064_1	0x39 //0x72
+#define SAA1064_2	0x3A //0x74
 
 #define LED_Current0	0x04
 #define LED_Current1	0x04
@@ -115,6 +115,8 @@ typedef union {
 // ----Prototype-Declarations--------------------------------------------------------  
 
 void IlluminationInit(void);
+
+void writeIllum();
 
 void IlluminateCoinInsert(unsigned char on);
 void IlluminateBillInsert(unsigned char on);

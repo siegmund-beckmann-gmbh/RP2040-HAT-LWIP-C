@@ -247,7 +247,7 @@ void IlluminationInit()
 {
     int i,c;
 
-	i2c_init(I2C_HW , 400000);
+	i2c_init(I2C_HW , 100000);
 
     gpio_set_function(PIN_SDA, GPIO_FUNC_I2C);
     gpio_set_function(PIN_SCL, GPIO_FUNC_I2C);
@@ -282,71 +282,51 @@ void IlluminationInit()
     FRONTRGBStatus[2]=InitFRONTRGB(2);
 }
 
-/*
 void writeIllum()
 {
- unsigned char a,b, r;
- unsigned char far* Led_Animation;
+ 	unsigned char *Led_Animation;
+ 	unsigned char sendData[8];
 
-        Led_Animation = (char far*)animation[CoinIllumAni];
+    Led_Animation = (char *)animation[CoinIllumAni];
 
-	a = Led_Animation[(CoinIllum*2)+1];
-	b = Led_Animation[(CoinIllum*2)+2];
-	if(++CoinIllum >= Led_Animation[0])
-	  CoinIllum = 0;
+	if(++CoinIllum >= Led_Animation[0]) CoinIllum = 0;
+
+	sendData[0]= 0x00;
+	sendData[1]= 0x07+((LED_Current0 & 0x07) << 4);	//Control full Current
+	sendData[2]= Led_Animation[(CoinIllum*2)+2];
+	sendData[3]= 0x00;
+	sendData[4]= 0x00;
+	sendData[5]= Led_Animation[(CoinIllum*2)+1];
 	
-	StartI2C_KB();
-	if (WriteI2C_KB(SAA1064_0) ==0)
-	{	
-	 	r = WriteI2C_KB(0x00);
-	 	r = WriteI2C_KB(0x07+((LED_Current0&0x07)<<4));	//Control full Current
-	 	r = WriteI2C_KB(b);
-	 	r = WriteI2C_KB(0x00);
-	 	r = WriteI2C_KB(0x00);
-	 	r = WriteI2C_KB(a);
-   	}
-	StopI2C_KB();	
+	i2c_write_blocking(I2C_HW,SAA1064_0,&sendData[0],6,false);
 
-        Led_Animation = (char far*)animation[BillIllumAni];
+    Led_Animation = (char *)animation[BillIllumAni];
 
-	a = Led_Animation[(BillIllum*2)+1];
-	b = Led_Animation[(BillIllum*2)+2];
-	if(++BillIllum >= Led_Animation[0])
-	  BillIllum = 0;
+	if(++BillIllum >= Led_Animation[0]) BillIllum = 0;
 
-	StartI2C_KB();
-	if (WriteI2C_KB(SAA1064_1) ==0)
-	{	
-	 	r = WriteI2C_KB(0x00);
-	 	r = WriteI2C_KB(0x07+((LED_Current1&0x07)<<4));	//Control full Current
-	 	r = WriteI2C_KB(b);
-	 	r = WriteI2C_KB(0x00);
-	 	r = WriteI2C_KB(0x00);
-	 	r = WriteI2C_KB(a);
-   	}
-	StopI2C_KB();	
+	sendData[0]= 0x00;
+	sendData[1]= 0x07+((LED_Current0 & 0x07) << 4);	//Control full Current
+	sendData[2]= Led_Animation[(BillIllum*2)+2];
+	sendData[3]= 0x00;
+	sendData[4]= 0x00;
+	sendData[5]= Led_Animation[(BillIllum*2)+1];
+	
+	i2c_write_blocking(I2C_HW,SAA1064_1,&sendData[0],6,false);
 		
-        Led_Animation = (char far*)animation[CardIllumAni];
+    Led_Animation = (char *)animation[CardIllumAni];
 
-	a = Led_Animation[(CardIllum*2)+1];
-	b = Led_Animation[(CardIllum*2)+2];
-	if(++CardIllum >= Led_Animation[0])
-	  CardIllum = 0;
+	if(++CardIllum >= Led_Animation[0]) CardIllum = 0;
+
+	sendData[0]= 0x00;
+	sendData[1]= 0x07+((LED_Current0 & 0x07) << 4);	//Control full Current
+	sendData[2]= Led_Animation[(CardIllum*2)+2];
+	sendData[3]= 0x00;
+	sendData[4]= 0x00;
+	sendData[5]= Led_Animation[(CardIllum*2)+1];
 	
-	StartI2C_KB();
-	if (WriteI2C_KB(SAA1064_2) ==0)
-	{	
-	 	r = WriteI2C_KB(0x00);
-	 	r = WriteI2C_KB(0x07+((LED_Current2&0x07)<<4));	//Control full Current
-	 	r = WriteI2C_KB(b);
-	 	r = WriteI2C_KB(0x00);
-	 	r = WriteI2C_KB(0x00);
-	 	r = WriteI2C_KB(a);
-   	}
-	StopI2C_KB();	
+	i2c_write_blocking(I2C_HW,SAA1064_2,&sendData[0],6,false);
 	
 }
-*/
 
 //-----------------------------------------------------------------------------------
 

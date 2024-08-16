@@ -2989,7 +2989,7 @@ void TX_Handle_Changer(ChangerTag *MDB_Changer,unsigned int adr)
 		#endif		  
        	  	if (adr == MDB_Adr_Changer2) InitChanger2();        	  
 		  
-          	return;
+          	//return;
         }
     }
 	

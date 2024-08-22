@@ -168,6 +168,8 @@ const RGBANI *RGB_Animation[]={	(RGBANI *)&RGB_off[0],
 								(RGBANI *)&RGB_custom[2][0]
                                 };
 
+bool illumReady = false;
+
 
 /*******************************************************************************
  * Function Declarations
@@ -210,7 +212,7 @@ int reg_write(  i2c_inst_t *i2c,
     }
 
     // Write data to register(s) over I2C
-    i2c_write_blocking(i2c, addr, msg, (nbytes + 1), false);
+    i2c_write_timeout_per_char_us(i2c, addr, msg, (nbytes + 1), false, 1000);
 
     return num_bytes_read;
 }
@@ -232,10 +234,10 @@ int reg_read(  i2c_inst_t *i2c,
     }
 
     // Read data from register(s) over I2C
-    num_bytes_written = i2c_write_blocking(i2c, addr, &reg, 1, true);
+    num_bytes_written = i2c_write_timeout_per_char_us(i2c, addr, &reg, 1, true, 1000);
 
 	if (num_bytes_written != PICO_ERROR_GENERIC) {
-    	num_bytes_read = i2c_read_blocking(i2c, addr, buf, nbytes, false);
+    	num_bytes_read = i2c_read_timeout_per_char_us(i2c, addr, buf, nbytes, false, 1000);
 	}
 
 	return num_bytes_read;
@@ -280,10 +282,14 @@ void IlluminationInit()
     FRONTRGBStatus[0]=InitFRONTRGB(0);
     FRONTRGBStatus[1]=InitFRONTRGB(1);
     FRONTRGBStatus[2]=InitFRONTRGB(2);
+	
+	illumReady = true;
 }
 
 void writeIllum()
 {
+	if (!illumReady) return;
+
  	unsigned char *Led_Animation;
  	unsigned char sendData[8];
 
@@ -298,7 +304,7 @@ void writeIllum()
 	sendData[4]= 0x00;
 	sendData[5]= Led_Animation[(CoinIllum*2)+1];
 	
-	i2c_write_blocking(I2C_HW,SAA1064_0,&sendData[0],6,false);
+	i2c_write_timeout_per_char_us(I2C_HW,SAA1064_0,&sendData[0],6,false, 1000);
 
     Led_Animation = (char *)animation[BillIllumAni];
 
@@ -311,7 +317,7 @@ void writeIllum()
 	sendData[4]= 0x00;
 	sendData[5]= Led_Animation[(BillIllum*2)+1];
 	
-	i2c_write_blocking(I2C_HW,SAA1064_1,&sendData[0],6,false);
+	i2c_write_timeout_per_char_us(I2C_HW,SAA1064_1,&sendData[0],6,false, 1000);
 		
     Led_Animation = (char *)animation[CardIllumAni];
 
@@ -324,7 +330,7 @@ void writeIllum()
 	sendData[4]= 0x00;
 	sendData[5]= Led_Animation[(CardIllum*2)+1];
 	
-	i2c_write_blocking(I2C_HW,SAA1064_2,&sendData[0],6,false);
+	i2c_write_timeout_per_char_us(I2C_HW,SAA1064_2,&sendData[0],6,false, 1000);
 	
 }
 
@@ -429,6 +435,9 @@ unsigned char InitFRONTRGB(char adr)
 
 void ScanFRONTRGB(char adr)	//alle 20ms
 {
+
+	if (!illumReady) return;
+
 	unsigned char r,t,count,bri[3],hchip[4];	
 	unsigned int mask;
 	RGBANI *pRGBAni;
@@ -520,7 +529,7 @@ void ScanFRONTRGB(char adr)	//alle 20ms
 	// pack adress and data to String
 	for (int c=0;c<FRONTRGB_Count[adr];c++) sendData[c+1]=FRONTRGB[adr].Data[(FRONTRGB_Adr[adr]+c)];
 	
-    if (i2c_write_blocking(I2C_HW,PCA[adr],&sendData[0],FRONTRGB_Count[adr]+1,false) == PICO_ERROR_GENERIC) {
+    if (i2c_write_timeout_per_char_us(I2C_HW,PCA[adr],&sendData[0],FRONTRGB_Count[adr]+1,false, 1000) == PICO_ERROR_GENERIC) {
    	   	if(FRONTRGB_Lost[adr])
         {
      	    FRONTRGB_Lost[adr]--;

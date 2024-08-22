@@ -7,6 +7,7 @@ set(TARGET_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/hexdump.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/mdb.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/illumination.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/rtc.c
     )
 
 add_executable(${TARGET_NAME} ${TARGET_FILES})

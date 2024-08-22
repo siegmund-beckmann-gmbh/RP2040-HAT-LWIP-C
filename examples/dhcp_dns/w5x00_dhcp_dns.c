@@ -40,6 +40,7 @@
 #include "mdb.h"
 #include "hexdump.h"
 #include "illumination.h"
+#include "rtc.h"
 
 /**
  * ----------------------------------------------------------------------------------------------------
@@ -81,20 +82,22 @@ static ip_addr_t g_resolved;
 
 /* Timer */
 static volatile uint16_t msec_cnt = 0;
-static volatile uint16_t dht_cnt = 0;
+static volatile uint16_t rtc_cnt = 0;
 
 static struct repeating_timer my_timer;
 void (*my_callback_ptr)(void);
 
 static void repeating_timer_1ms_callback(void);
-static void repeating_timer_20ms_callback(void);
+static void repeating_timer_10ms_callback(void);
 
-bool my_20ms_timer_callback(struct repeating_timer *t);
+bool my_10ms_timer_callback(struct repeating_timer *t);
 
 /* Clock */
 static void set_clock_khz(void);
 static void my_netif_status_callback(struct netif *netif);
 
+/* RTC */
+extern unsigned char TimeRegDEC[7];
 
 /* MDB */
 extern queue_t MDBfifo;
@@ -106,18 +109,20 @@ extern queue_t MDBfifo;
  */
 
 /* Timer */
-void my_20ms_timer_initialize(void (*callback)(void))
+void my_10ms_timer_initialize(void (*callback)(void))
 {
     my_callback_ptr = callback;
-    add_repeating_timer_us(-20000, my_20ms_timer_callback, NULL, &my_timer);
+    add_repeating_timer_us(-10000, my_10ms_timer_callback, NULL, &my_timer);
 }
 
-bool my_20ms_timer_callback(struct repeating_timer *t)
+bool my_10ms_timer_callback(struct repeating_timer *t)
 {
     if (my_callback_ptr != NULL)
     {
         my_callback_ptr();
     }
+
+    return true;
 }
 
 /**
@@ -145,11 +150,13 @@ int main()
     // Initialize stdio after the clock change
     stdio_init_all();
 
+    InitClock();
+
     IlluminationInit();
 
     pico_get_unique_board_id(&SystemID);    
     
-    my_20ms_timer_initialize(repeating_timer_20ms_callback);
+    my_10ms_timer_initialize(repeating_timer_10ms_callback);
 
     wizchip_1ms_timer_initialize(repeating_timer_1ms_callback);
 
@@ -265,6 +272,8 @@ int main()
                 printf("fifo empty");
             }   
 
+            printf("Current RTC: %02u.%02u.20%02u %02u:%02u:%02u\n", TimeRegDEC[4], TimeRegDEC[5],  TimeRegDEC[6], TimeRegDEC[2], TimeRegDEC[1], TimeRegDEC[0]);
+
             switch (ev.Type)
             {
             case EvTypeMDB_ChangerReady:
@@ -330,20 +339,25 @@ void my_netif_status_callback(struct netif *netif)
 /* Timer */
 static void repeating_timer_1ms_callback(void)
 {            
-    if(g_dns_get_ip_flag) handleMDBtimer();
+    if (g_dns_get_ip_flag) handleMDBtimer();
 
-    if (++msec_cnt > 19) {
-        msec_cnt=0;
-        //get_frontRGB = 1;
-    }
+    if (++msec_cnt > 19) msec_cnt=0;
+
 }
 
+static void repeating_timer_10ms_callback(void)
+{       
+    if (++rtc_cnt == 10) {
+        ReadTimeFromClock();
+        rtc_cnt=0;
+    }
 
-static void repeating_timer_20ms_callback(void)
-{   
-    ScanFRONTRGB(0);             
-    ScanFRONTRGB(1);
-    ScanFRONTRGB(2);
-    writeIllum();
-    
+    if (rtc_cnt & 0x01) {
+        ScanFRONTRGB(0);             
+        ScanFRONTRGB(2);
+    }
+    else {
+        ScanFRONTRGB(1);
+        writeIllum();
+    }
 }

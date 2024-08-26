@@ -10,6 +10,13 @@ set(TARGET_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/rtc.c
     )
 
+add_definitions(
+        -DSNTP_SERVER_DNS=1
+        -DSNTP_SERVER_ADDRESS="pool.ntp.org"
+        -DSNTP_SET_SYSTEM_TIME=set_system_time
+        -DSNTP_STARTUP_DELAY=0
+)
+
 add_executable(${TARGET_NAME} ${TARGET_FILES})
 
 target_include_directories(w5x00_dhcp_dns PUBLIC
@@ -30,11 +37,13 @@ pico_generate_pio_header(${TARGET_NAME} ${CMAKE_CURRENT_LIST_DIR}/sql_client/uar
 target_link_libraries(${TARGET_NAME} PRIVATE
         pico_stdlib
         pico_util
+        pico_lwip_sntp
         hardware_spi
         hardware_dma
         hardware_pio
         hardware_flash
         hardware_i2c
+        cmsis_core
         ETHERNET_FILES
         IOLIBRARY_FILES
         LWIP_FILES

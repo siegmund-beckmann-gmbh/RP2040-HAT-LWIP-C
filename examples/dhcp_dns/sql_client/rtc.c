@@ -40,15 +40,20 @@ unsigned char InitClock()
     if (i2c_write_timeout_per_char_us(I2C_CLOCK, DS1307, &sendData[0], 2, false, 1000) != PICO_ERROR_GENERIC) {
 
         result=1;
-        
-        if (i2c_read_timeout_per_char_us(I2C_CLOCK, DS1307, &TimeReg[0], 1, false, 1000) != PICO_ERROR_GENERIC) {
+
+        if (i2c_write_timeout_per_char_us(I2C_CLOCK, DS1307, &sendData[0], 1, true, 1000) != PICO_ERROR_GENERIC) {
 
             sendData[0] = 0x00;
-            sendData[1] = TimeReg[0] & 0x7f;
+        
+            if (i2c_read_timeout_per_char_us(I2C_CLOCK, DS1307, &TimeReg[0], 1, false, 1000) != PICO_ERROR_GENERIC) {
 
-            if (i2c_write_timeout_per_char_us(I2C_CLOCK, DS1307, &sendData[0], 2, false, 1000) != PICO_ERROR_GENERIC) {
-            }
-        }        
+                sendData[0] = 0x00;
+                sendData[1] = TimeReg[0] & 0x7f;
+
+                if (i2c_write_timeout_per_char_us(I2C_CLOCK, DS1307, &sendData[0], 2, false, 1000) != PICO_ERROR_GENERIC) {
+                }
+            }        
+        }
 
     }
 		

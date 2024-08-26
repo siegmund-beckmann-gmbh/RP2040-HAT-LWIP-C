@@ -22,7 +22,7 @@
 #include "lwip/netif.h"
 #include "lwip/timeouts.h"
 
-#include "lwip/apps/lwiperf.h"
+#include "lwip/apps/sntp.h"
 #include "lwip/etharp.h"
 #include "lwip/dhcp.h"
 #include "lwip/dns.h"
@@ -98,9 +98,12 @@ static void my_netif_status_callback(struct netif *netif);
 
 /* RTC */
 extern unsigned char TimeRegDEC[7];
+bool timeRead = false;
 
 /* MDB */
 extern queue_t MDBfifo;
+
+void set_system_time(uint32_t sec);
 
 /**
  * ----------------------------------------------------------------------------------------------------
@@ -159,7 +162,7 @@ int main()
     my_10ms_timer_initialize(repeating_timer_10ms_callback);
 
     wizchip_1ms_timer_initialize(repeating_timer_1ms_callback);
-
+    
     InitMDB();
     
     printf("starting up...\nSystemID =",status);
@@ -207,7 +210,11 @@ int main()
     dhcp_start(&g_netif);
 
     dns_init();
-        
+
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_servermode_dhcp(1);
+    sntp_init();
+
     /* Infinite loop */
     while (1)
     {
@@ -263,6 +270,11 @@ int main()
 
         /* Cyclic lwIP timers check */
         sys_check_timeouts();
+
+        if (timeRead) {
+            //printf("Current RTC: %02u.%02u.20%02u %02u:%02u:%02u\n", TimeRegDEC[4], TimeRegDEC[5],  TimeRegDEC[6], TimeRegDEC[2], TimeRegDEC[1], TimeRegDEC[0]);
+            timeRead = false;
+        }
         
         while(!queue_is_empty(&MDBfifo)) {
             MDB_EVENT ev;
@@ -271,9 +283,7 @@ int main()
             if (!queue_try_remove(&MDBfifo, &ev)) {
                 printf("fifo empty");
             }   
-
-            printf("Current RTC: %02u.%02u.20%02u %02u:%02u:%02u\n", TimeRegDEC[4], TimeRegDEC[5],  TimeRegDEC[6], TimeRegDEC[2], TimeRegDEC[1], TimeRegDEC[0]);
-
+            
             switch (ev.Type)
             {
             case EvTypeMDB_ChangerReady:
@@ -347,9 +357,11 @@ static void repeating_timer_1ms_callback(void)
 
 static void repeating_timer_10ms_callback(void)
 {       
-    if (++rtc_cnt == 10) {
+    if (++rtc_cnt >= 100) rtc_cnt=0;
+
+    if ((rtc_cnt % 50)==0) {
         ReadTimeFromClock();
-        rtc_cnt=0;
+        timeRead = true;
     }
 
     if (rtc_cnt & 0x01) {
@@ -361,3 +373,40 @@ static void repeating_timer_10ms_callback(void)
         writeIllum();
     }
 }
+/*
+void set_system_time(uint32_t sec)
+{
+    time_t epoch = sec;
+    struct tm *time = gmtime(&epoch);
+
+    datetime_t datetime = {
+            .year = (int16_t) (1900 + time->tm_year),
+            .month = (int8_t) (time->tm_mon + 1),
+            .day = (int8_t) time->tm_mday,
+            .hour = (int8_t) time->tm_hour,
+            .min = (int8_t) time->tm_min,
+            .sec = (int8_t) time->tm_sec,
+            .dotw = (int8_t) time->tm_wday,
+    };
+
+    // rtc_set_datetime(&datetime);
+    printf("Got Time from NTP! %u, %02u:%02u:%02u %02u:%02u:%02u" ,datetime.dotw, datetime.day, datetime.month, datetime.year, datetime.hour, datetime.min, datetime.sec);
+
+}*/
+
+void set_system_time(u32_t sec)
+{
+  char buf[32];
+  struct tm current_time_val;
+  time_t current_time = (time_t)sec;
+
+#if defined(_WIN32) || defined(WIN32)
+  localtime_s(&current_time_val, &current_time);
+#else
+  localtime_r(&current_time, &current_time_val);
+#endif
+
+  strftime(buf, sizeof(buf), "%d.%m.%Y %H:%M:%S", &current_time_val);
+  printf("SNTP time: %s\n", buf);
+}
+

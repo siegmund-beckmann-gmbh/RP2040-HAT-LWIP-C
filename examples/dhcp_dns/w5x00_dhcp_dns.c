@@ -103,7 +103,50 @@ bool timeRead = false;
 /* MDB */
 extern queue_t MDBfifo;
 
-void set_system_time(uint32_t sec);
+/* GPIO */
+
+queue_t KEYfifo;
+
+const uint PROG_PIN_1 = 14;
+const uint PROG_PIN_2 = 15;
+
+const uint KEYS_LEFT_1 = 4;
+const uint KEYS_LEFT_2 = 5;
+const uint KEYS_LEFT_3 = 6;
+const uint KEYS_LEFT_4 = 7;
+
+const uint KEYS_RIGHT_1 = 10;
+const uint KEYS_RIGHT_2 = 11;
+const uint KEYS_RIGHT_3 = 12;
+const uint KEYS_RIGHT_4 = 13;
+
+bool progPin1State = false;
+bool progPin2State = false;
+
+bool keysLeft1State = false;
+bool keysLeft2State = false;
+bool keysLeft3State = false;
+bool keysLeft4State = false;
+
+bool keysRight1State = false;
+bool keysRight2State = false;
+bool keysRight3State = false;
+bool keysRight4State = false;
+
+typedef struct __attribute__((packed)) KEYevent{
+	unsigned int  Type;
+	unsigned int  Length;
+	unsigned char Data[60];
+}KEY_EVENT;
+
+KEY_EVENT KeyEvent;
+
+enum KeyEvent_types{
+	EvTypeKey_Released = 1,
+	EvTypeKey_Pressed
+};
+
+void set_system_time(u32_t sec);
 
 /**
  * ----------------------------------------------------------------------------------------------------
@@ -153,11 +196,20 @@ int main()
     // Initialize stdio after the clock change
     stdio_init_all();
 
-    InitClock();
+    gpio_init(PROG_PIN_1);
+    gpio_set_dir(PROG_PIN_1, GPIO_IN);
+    gpio_init(PROG_PIN_2);
+    gpio_set_dir(PROG_PIN_2, GPIO_IN);
+
+    unsigned char RTCavail = InitClock();
+
+    printf("rtc chip ds1307 available= %u \n",RTCavail);
 
     IlluminationInit();
 
     pico_get_unique_board_id(&SystemID);    
+
+    queue_init(&KEYfifo, sizeof(KEY_EVENT), 32);    
     
     my_10ms_timer_initialize(repeating_timer_10ms_callback);
 
@@ -165,7 +217,7 @@ int main()
     
     InitMDB();
     
-    printf("starting up...\nSystemID =",status);
+    printf("starting up...\nSystemID = ");
     hexdump(&SystemID,sizeof(SystemID),8,8);    
 
     sleep_ms(100); // wait a while
@@ -281,7 +333,7 @@ int main()
             unsigned int coinval;
 
             if (!queue_try_remove(&MDBfifo, &ev)) {
-                printf("fifo empty");
+                printf("MDB fifo empty");
             }   
             
             switch (ev.Type)
@@ -309,10 +361,30 @@ int main()
             default:
                 printf("MDB Event %d Length %d\n", ev.Type, ev.Length);
                 break;
-            }
+            }            
+        }    
 
+        while(!queue_is_empty(&KEYfifo)) {
+            KEY_EVENT evKey;
+
+            if (!queue_try_remove(&KEYfifo, &evKey)) {
+                printf("KEY fifo empty");
+            }   
             
-        }           
+            switch (evKey.Type)
+            {
+            case EvTypeKey_Pressed:
+                printf("KEY %d pressed!\n", evKey.Data[0]);
+            break;
+            case EvTypeKey_Released:
+                printf("KEY %d released!\n", evKey.Data[0]);
+            break;
+            default:
+                printf("KEY Event %d Length %d\n", evKey.Type, evKey.Length);
+            break;
+            }
+        }
+
     }
 }
 
@@ -346,6 +418,13 @@ void my_netif_status_callback(struct netif *netif)
     g_dns_get_ip_flag=0;
 }
 
+void putKeyEvent(KEY_EVENT *event ) {
+	if (!queue_try_add(&KEYfifo, event)) {
+		printf("KEY fifo full");
+	}			      			
+}
+
+
 /* Timer */
 static void repeating_timer_1ms_callback(void)
 {            
@@ -372,6 +451,122 @@ static void repeating_timer_10ms_callback(void)
         ScanFRONTRGB(1);
         writeIllum();
     }
+
+    //scan keys
+    if (gpio_get(PROG_PIN_1)) {
+        if (progPin1State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 128;
+  			KeyEvent.Length  = 0;
+  			putKeyEvent(&KeyEvent);
+        }
+        progPin1State = false;
+    }
+    else {
+        if (!progPin1State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 128;
+  			KeyEvent.Length  = 0;
+  			putKeyEvent(&KeyEvent);            
+        }
+        progPin1State = true;
+    }
+
+    if (gpio_get(PROG_PIN_2)) {
+        if (progPin2State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 129;
+  			KeyEvent.Length  = 0;
+  			putKeyEvent(&KeyEvent);
+        }
+        progPin2State = false;
+    }
+    else {
+        if (!progPin2State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 129;
+  			KeyEvent.Length  = 0;
+  			putKeyEvent(&KeyEvent);
+        }
+        progPin2State = true;
+    }
+
+    if (gpio_get(KEYS_LEFT_1)) {
+        if (keysLeft1State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 0;
+  			KeyEvent.Length  = 0;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysLeft1State = false;
+    }
+    else {
+        if (!keysLeft1State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 0;
+  			KeyEvent.Length  = 0;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysLeft1State = true;
+    }
+
+    if (gpio_get(KEYS_LEFT_2)) {
+        if (keysLeft2State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 1;
+  			KeyEvent.Length  = 0;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysLeft2State = false;
+    }
+    else {
+        if (!keysLeft2State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 1;
+  			KeyEvent.Length  = 0;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysLeft2State = true;
+    }
+
+    if (gpio_get(KEYS_LEFT_3)) {
+        if (keysLeft3State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 2;
+  			KeyEvent.Length  = 0;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysLeft3State = false;
+    }
+    else {
+        if (!keysLeft3State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 2;
+  			KeyEvent.Length  = 0;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysLeft3State = true;
+    }
+
+    if (gpio_get(KEYS_LEFT_4)) {
+        if (keysLeft4State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 3;
+  			KeyEvent.Length  = 0;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysLeft4State = false;
+    }
+    else {
+        if (!keysLeft4State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 3;
+  			KeyEvent.Length  = 0;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysLeft4State = true;
+    }
+
 }
 /*
 void set_system_time(uint32_t sec)

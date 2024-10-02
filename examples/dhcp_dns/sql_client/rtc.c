@@ -11,6 +11,11 @@ unsigned char TimeReg[7];
 unsigned char CopyReg[7];
 unsigned char TimeRegDEC[7];
 
+bool trayLight = false;
+bool directEntry = false;
+bool directSignal = false;
+bool relais4 = false;
+bool relais5 = false;
 
 /*******************************************************************************
  * Function Declarations
@@ -28,7 +33,7 @@ unsigned char InitClock()
     unsigned char sendData[8];
     unsigned char result=0;
 
-	i2c_init(I2C_CLOCK , 100000);
+	i2c_init(I2C_INTERNAL , 100000);
 
     gpio_set_function(PIN_SDA_CLK, GPIO_FUNC_I2C);
     gpio_set_function(PIN_SCL_CLK, GPIO_FUNC_I2C);
@@ -37,20 +42,20 @@ unsigned char InitClock()
     sendData[0] = 0x07;
     sendData[1] = 0x10;
 
-    if (i2c_write_timeout_per_char_us(I2C_CLOCK, DS1307, &sendData[0], 2, false, 1000) != PICO_ERROR_GENERIC) {
+    if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 2, false, 1000) != PICO_ERROR_GENERIC) {
 
         result=1;
 
-        if (i2c_write_timeout_per_char_us(I2C_CLOCK, DS1307, &sendData[0], 1, true, 1000) != PICO_ERROR_GENERIC) {
+        if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 1, true, 1000) != PICO_ERROR_GENERIC) {
 
             sendData[0] = 0x00;
         
-            if (i2c_read_timeout_per_char_us(I2C_CLOCK, DS1307, &TimeReg[0], 1, false, 1000) != PICO_ERROR_GENERIC) {
+            if (i2c_read_timeout_per_char_us(I2C_INTERNAL, DS1307, &TimeReg[0], 1, false, 1000) != PICO_ERROR_GENERIC) {
 
                 sendData[0] = 0x00;
                 sendData[1] = TimeReg[0] & 0x7f;
 
-                if (i2c_write_timeout_per_char_us(I2C_CLOCK, DS1307, &sendData[0], 2, false, 1000) != PICO_ERROR_GENERIC) {
+                if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 2, false, 1000) != PICO_ERROR_GENERIC) {
                 }
             }        
         }
@@ -80,7 +85,7 @@ unsigned char SetClock()
     sendData[6] = TimeReg[5];
     sendData[7] = TimeReg[6];
 
-    if (i2c_write_timeout_per_char_us(I2C_CLOCK, DS1307, &sendData[0], 8, false, 1000) != PICO_ERROR_GENERIC) {
+    if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 8, false, 1000) != PICO_ERROR_GENERIC) {
 
         result=1;
     }
@@ -96,9 +101,9 @@ void ReadClock()
 
     sendData[0] = 0x00;
 
-    if (i2c_write_timeout_per_char_us(I2C_CLOCK, DS1307, &sendData[0], 1, true, 1000) != PICO_ERROR_GENERIC) {
+    if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 1, true, 1000) != PICO_ERROR_GENERIC) {
 
-        if (i2c_read_timeout_per_char_us(I2C_CLOCK, DS1307, &TimeReg[0], 7, false, 1000) != PICO_ERROR_GENERIC) {
+        if (i2c_read_timeout_per_char_us(I2C_INTERNAL, DS1307, &TimeReg[0], 7, false, 1000) != PICO_ERROR_GENERIC) {
             result = 1;
         }
     }
@@ -134,6 +139,32 @@ void ReadTimeFromClock()
     for (int i=0;i<7;i++) TimeRegDEC[i] =  BCD2Dec(TimeReg[i] & 0x7F);
 }
 
+
+uint8_t scan_pcf()
+{
+    uint8_t scanVal = 0xE0;
+
+    scanVal |= (trayLight ? 0x00:0x01);
+    scanVal |= (directEntry ? 0x00:0x02);
+    scanVal |= (directSignal ? 0x00:0x04);
+    scanVal |= (relais4 ? 0x00:0x08);
+    scanVal |= (relais5 ? 0x00:0x10);
+
+    uint8_t sendData[8];
+
+    sendData[0] = scanVal;
+
+    if (i2c_write_timeout_per_char_us(I2C_INTERNAL, PCF9574_0, &sendData[0], 1, true, 1000) != PICO_ERROR_GENERIC) {
+
+        if (i2c_read_timeout_per_char_us(I2C_INTERNAL, PCF9574_0, &sendData[0], 1, false, 1000) != PICO_ERROR_GENERIC) {
+
+            return sendData[0];
+            
+        }
+    }
+
+
+}
 
 /****************************************************************************************************************************
  ****			   BECKMANN GmbH                                                                                 ****

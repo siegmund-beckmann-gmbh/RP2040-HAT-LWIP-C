@@ -100,6 +100,13 @@ static void my_netif_status_callback(struct netif *netif);
 extern unsigned char TimeRegDEC[7];
 bool timeRead = false;
 
+extern bool trayLight;
+extern bool directEntry;
+extern bool directSignal;
+extern bool relais4;
+extern bool relais5;
+
+
 /* MDB */
 extern queue_t MDBfifo;
 
@@ -120,6 +127,9 @@ const uint KEYS_RIGHT_2 = 11;
 const uint KEYS_RIGHT_3 = 12;
 const uint KEYS_RIGHT_4 = 13;
 
+const uint DirectEntryACK = 22;
+const uint DOOR = 28;
+
 bool progPin1State = false;
 bool progPin2State = false;
 
@@ -133,6 +143,13 @@ bool keysRight2State = false;
 bool keysRight3State = false;
 bool keysRight4State = false;
 
+bool directEntryState = false;
+bool doorState = false;
+
+bool ext1State = false;
+bool ext2State = false;
+bool ext3State = false;
+
 typedef struct __attribute__((packed)) KEYevent{
 	unsigned int  Type;
 	unsigned int  Length;
@@ -145,6 +162,8 @@ enum KeyEvent_types{
 	EvTypeKey_Released = 1,
 	EvTypeKey_Pressed
 };
+
+static uint KeyboardDelay = 10;
 
 void set_system_time(u32_t sec);
 
@@ -200,6 +219,26 @@ int main()
     gpio_set_dir(PROG_PIN_1, GPIO_IN);
     gpio_init(PROG_PIN_2);
     gpio_set_dir(PROG_PIN_2, GPIO_IN);
+    gpio_init(KEYS_LEFT_1);
+    gpio_init(KEYS_LEFT_2);
+    gpio_init(KEYS_LEFT_3);
+    gpio_init(KEYS_LEFT_4);
+    gpio_set_dir(KEYS_LEFT_1, GPIO_IN);
+    gpio_set_dir(KEYS_LEFT_2, GPIO_IN);
+    gpio_set_dir(KEYS_LEFT_3, GPIO_IN);
+    gpio_set_dir(KEYS_LEFT_4, GPIO_IN);
+    gpio_init(KEYS_RIGHT_1);
+    gpio_init(KEYS_RIGHT_2);
+    gpio_init(KEYS_RIGHT_3);
+    gpio_init(KEYS_RIGHT_4);
+    gpio_set_dir(KEYS_RIGHT_1, GPIO_IN);
+    gpio_set_dir(KEYS_RIGHT_2, GPIO_IN);
+    gpio_set_dir(KEYS_RIGHT_3, GPIO_IN);
+    gpio_set_dir(KEYS_RIGHT_4, GPIO_IN);
+    gpio_init(DirectEntryACK);
+    gpio_set_dir(DirectEntryACK, GPIO_IN);
+    gpio_init(DOOR);
+    gpio_set_dir(DOOR, GPIO_IN);
 
     unsigned char RTCavail = InitClock();
 
@@ -375,6 +414,11 @@ int main()
             {
             case EvTypeKey_Pressed:
                 printf("KEY %d pressed!\n", evKey.Data[0]);
+                if (evKey.Data[0] == 8) trayLight = !trayLight;
+                if (evKey.Data[0] == 9) directEntry = !directEntry;
+                if (evKey.Data[0] == 10) directSignal = !directSignal;
+                if (evKey.Data[0] == 12) relais4 = !relais4;
+                if (evKey.Data[0] == 13) relais5 = !relais5;
             break;
             case EvTypeKey_Released:
                 printf("KEY %d released!\n", evKey.Data[0]);
@@ -421,7 +465,8 @@ void my_netif_status_callback(struct netif *netif)
 void putKeyEvent(KEY_EVENT *event ) {
 	if (!queue_try_add(&KEYfifo, event)) {
 		printf("KEY fifo full");
-	}			      			
+	}
+    KeyboardDelay = 5;			      			
 }
 
 
@@ -453,11 +498,17 @@ static void repeating_timer_10ms_callback(void)
     }
 
     //scan keys
+
+    if (KeyboardDelay) {
+        KeyboardDelay--;
+        return;
+    }
+
     if (gpio_get(PROG_PIN_1)) {
         if (progPin1State) {
             KeyEvent.Type    = EvTypeKey_Released;
-            KeyEvent.Data[0] = 128;
-  			KeyEvent.Length  = 0;
+            KeyEvent.Data[0] = 8;
+  			KeyEvent.Length  = 1;
   			putKeyEvent(&KeyEvent);
         }
         progPin1State = false;
@@ -465,8 +516,8 @@ static void repeating_timer_10ms_callback(void)
     else {
         if (!progPin1State) {
             KeyEvent.Type    = EvTypeKey_Pressed;
-            KeyEvent.Data[0] = 128;
-  			KeyEvent.Length  = 0;
+            KeyEvent.Data[0] = 8;
+  			KeyEvent.Length  = 1;
   			putKeyEvent(&KeyEvent);            
         }
         progPin1State = true;
@@ -475,8 +526,8 @@ static void repeating_timer_10ms_callback(void)
     if (gpio_get(PROG_PIN_2)) {
         if (progPin2State) {
             KeyEvent.Type    = EvTypeKey_Released;
-            KeyEvent.Data[0] = 129;
-  			KeyEvent.Length  = 0;
+            KeyEvent.Data[0] = 9;
+  			KeyEvent.Length  = 1;
   			putKeyEvent(&KeyEvent);
         }
         progPin2State = false;
@@ -484,8 +535,8 @@ static void repeating_timer_10ms_callback(void)
     else {
         if (!progPin2State) {
             KeyEvent.Type    = EvTypeKey_Pressed;
-            KeyEvent.Data[0] = 129;
-  			KeyEvent.Length  = 0;
+            KeyEvent.Data[0] = 9;
+  			KeyEvent.Length  = 1;
   			putKeyEvent(&KeyEvent);
         }
         progPin2State = true;
@@ -495,7 +546,7 @@ static void repeating_timer_10ms_callback(void)
         if (keysLeft1State) {
             KeyEvent.Type    = EvTypeKey_Released;
             KeyEvent.Data[0] = 0;
-  			KeyEvent.Length  = 0;
+  			KeyEvent.Length  = 1;
   			putKeyEvent(&KeyEvent);
         }
         keysLeft1State = false;
@@ -504,7 +555,7 @@ static void repeating_timer_10ms_callback(void)
         if (!keysLeft1State) {
             KeyEvent.Type    = EvTypeKey_Pressed;
             KeyEvent.Data[0] = 0;
-  			KeyEvent.Length  = 0;
+  			KeyEvent.Length  = 1;
   			putKeyEvent(&KeyEvent);
         }
         keysLeft1State = true;
@@ -514,7 +565,7 @@ static void repeating_timer_10ms_callback(void)
         if (keysLeft2State) {
             KeyEvent.Type    = EvTypeKey_Released;
             KeyEvent.Data[0] = 1;
-  			KeyEvent.Length  = 0;
+  			KeyEvent.Length  = 1;
   			putKeyEvent(&KeyEvent);
         }
         keysLeft2State = false;
@@ -523,7 +574,7 @@ static void repeating_timer_10ms_callback(void)
         if (!keysLeft2State) {
             KeyEvent.Type    = EvTypeKey_Pressed;
             KeyEvent.Data[0] = 1;
-  			KeyEvent.Length  = 0;
+  			KeyEvent.Length  = 1;
   			putKeyEvent(&KeyEvent);
         }
         keysLeft2State = true;
@@ -533,7 +584,7 @@ static void repeating_timer_10ms_callback(void)
         if (keysLeft3State) {
             KeyEvent.Type    = EvTypeKey_Released;
             KeyEvent.Data[0] = 2;
-  			KeyEvent.Length  = 0;
+  			KeyEvent.Length  = 1;
   			putKeyEvent(&KeyEvent);
         }
         keysLeft3State = false;
@@ -542,7 +593,7 @@ static void repeating_timer_10ms_callback(void)
         if (!keysLeft3State) {
             KeyEvent.Type    = EvTypeKey_Pressed;
             KeyEvent.Data[0] = 2;
-  			KeyEvent.Length  = 0;
+  			KeyEvent.Length  = 1;
   			putKeyEvent(&KeyEvent);
         }
         keysLeft3State = true;
@@ -552,7 +603,7 @@ static void repeating_timer_10ms_callback(void)
         if (keysLeft4State) {
             KeyEvent.Type    = EvTypeKey_Released;
             KeyEvent.Data[0] = 3;
-  			KeyEvent.Length  = 0;
+  			KeyEvent.Length  = 1;
   			putKeyEvent(&KeyEvent);
         }
         keysLeft4State = false;
@@ -561,11 +612,185 @@ static void repeating_timer_10ms_callback(void)
         if (!keysLeft4State) {
             KeyEvent.Type    = EvTypeKey_Pressed;
             KeyEvent.Data[0] = 3;
-  			KeyEvent.Length  = 0;
+  			KeyEvent.Length  = 1;
   			putKeyEvent(&KeyEvent);
         }
         keysLeft4State = true;
     }
+
+    if (gpio_get(KEYS_RIGHT_1)) {
+        if (keysRight1State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 4;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysRight1State = false;
+    }
+    else {
+        if (!keysRight1State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 4;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysRight1State = true;
+    }
+
+    if (gpio_get(KEYS_RIGHT_2)) {
+        if (keysRight2State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 5;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysRight2State = false;
+    }
+    else {
+        if (!keysRight2State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 5;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysRight2State = true;
+    }
+
+    if (gpio_get(KEYS_RIGHT_3)) {
+        if (keysRight3State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 6;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysRight3State = false;
+    }
+    else {
+        if (!keysRight3State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 6;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysRight3State = true;
+    }
+
+    if (gpio_get(KEYS_RIGHT_4)) {
+        if (keysRight4State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 7;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysRight4State = false;
+    }
+    else {
+        if (!keysRight4State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 7;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        keysRight4State = true;
+    }
+
+    if (gpio_get(DirectEntryACK)) {
+        if (directEntryState) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 10;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        directEntryState = false;
+    }
+    else {
+        if (!directEntryState) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 10;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        directEntryState = true;
+    }
+
+    if (gpio_get(DOOR)) {
+        if (doorState) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 11;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        doorState = false;
+    }
+    else {
+        if (!doorState) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 11;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        doorState = true;
+    }
+
+    uint8_t scan = scan_pcf();
+
+    if (scan & 0x20) {
+        if (ext1State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 12;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        ext1State = false;
+    }
+    else {
+        if (!ext1State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 12;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        ext1State = true;
+    }
+
+    if (scan & 0x80) {
+        if (ext2State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 13;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        ext2State = false;
+    }
+    else {
+        if (!ext2State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 13;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        ext2State = true;
+    }
+
+    if (scan & 0x40) {
+        if (ext3State) {
+            KeyEvent.Type    = EvTypeKey_Released;
+            KeyEvent.Data[0] = 14;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        ext3State = false;
+    }
+    else {
+        if (!ext3State) {
+            KeyEvent.Type    = EvTypeKey_Pressed;
+            KeyEvent.Data[0] = 14;
+  			KeyEvent.Length  = 1;
+  			putKeyEvent(&KeyEvent);
+        }
+        ext3State = true;
+    }
+
 
 }
 /*

@@ -17,6 +17,11 @@ bool directSignal = false;
 bool relais4 = false;
 bool relais5 = false;
 
+const unsigned char DayTab[12] ={31,28,31,30,31,30,31,31,30,31,30,31};
+const unsigned char DayTabLeap[12] ={31,29,31,30,31,30,31,31,30,31,30,31};
+const unsigned int DayTabN[13] ={0,31,59,90,120,151,181,212,243,273,304,334,365};
+const unsigned int DayTabS[13] ={0,31,60,91,121,152,182,213,244,274,305,335,366};
+
 /*******************************************************************************
  * Function Declarations
  */
@@ -139,6 +144,37 @@ void ReadTimeFromClock()
     for (int i=0;i<7;i++) TimeRegDEC[i] =  BCD2Dec(TimeReg[i] & 0x7F);
 }
 
+bool isDST(uint32_t sec)  // germany(europe)
+{
+    unsigned char wkdayNum,compdays;
+    int day;
+
+    struct tm current_time_val;
+    time_t current_time = (time_t)sec;
+
+#if defined(_WIN32) || defined(WIN32)
+    localtime_s(&current_time_val, &current_time);
+#else
+    localtime_r(&current_time, &current_time_val);
+#endif
+
+	compdays = DayTab[current_time_val.tm_mon-1];	//referenzfehler beseitigt 25.10.2010
+	if ((!(day=current_time_val.tm_year % 4)) && (current_time_val.tm_mon == 2)) compdays=29;
+
+	wkdayNum=1;
+	day=current_time_val.tm_mday;
+	while ((day-=7)>0) wkdayNum++;
+	
+	//TodayInfo.wkdayNum=wkdayNum;
+
+	day=current_time_val.tm_mday;
+	while ((day+=7)<=compdays) wkdayNum++;
+	
+	//TodayInfo.wkdayMax=wkdayNum;
+
+
+    return false;
+}
 
 uint8_t scan_pcf()
 {

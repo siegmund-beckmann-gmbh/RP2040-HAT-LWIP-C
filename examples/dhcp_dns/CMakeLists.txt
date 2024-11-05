@@ -1,13 +1,14 @@
 set(TARGET_NAME w5x00_dhcp_dns)
 set(LWIP_PATH ${PICO_SDK_PATH}/lib/lwip)
-set(TARGET_FILES    
-    w5x00_dhcp_dns.c
+set(TARGET_FILES        
+    ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/intercom.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/postgresql.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/md5.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/hexdump.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/mdb.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/illumination.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/rtc.c
+    w5x00_dhcp_dns.c
     )
 
 add_definitions(

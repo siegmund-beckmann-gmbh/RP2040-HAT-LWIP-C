@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
+
+#include "time.h"
   
   // declarations
 /* I2C */
@@ -29,6 +31,7 @@ unsigned char SetClock();
 void ReadClock();
 void ReadTimeFromClock();
 uint8_t scan_pcf();
+bool isDST(uint32_t sec);
 
 
 #endif /* RTC_H */

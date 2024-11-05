@@ -27,6 +27,7 @@
 #include "lwip/dhcp.h"
 #include "lwip/dns.h"
 
+#include "intercom.h"
 #include "postgresql.h"
 
 #include "timer.h"
@@ -302,6 +303,8 @@ int main()
 
     dns_init();
 
+    udp_remoteServer_init( IP4_ADDR_ANY, INTERCOM_CLIENT_PORT);
+
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_servermode_dhcp(1);
     sntp_init();
@@ -353,7 +356,8 @@ int main()
 
                 g_dns_get_ip_flag = 1;
 
-                tcp_postgresql_init(&g_resolved);
+                tcp_postgresql_init(&g_resolved);                
+                
             }
 
             old_status = status;
@@ -828,5 +832,6 @@ void set_system_time(u32_t sec)
 
   strftime(buf, sizeof(buf), "%d.%m.%Y %H:%M:%S", &current_time_val);
   printf("SNTP time: %s\n", buf);
+  printf("SNTP dst: %d\n", current_time_val.tm_isdst);
 }
 

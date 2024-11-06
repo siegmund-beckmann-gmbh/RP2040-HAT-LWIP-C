@@ -69,75 +69,75 @@ enum event_types{
 };
 
 typedef struct __attribute__((packed)) MDBevent{
-	unsigned int  Type;
-	unsigned int  Length;
-	unsigned char Data[60];
+	uint16_t  Type;
+	uint16_t  Length;
+	uint8_t Data[60];
 }MDB_EVENT;
 
 typedef struct HOPPERtag{	//20
-	unsigned int  Val;
-	unsigned int  Fill;
-	unsigned int  LastFill;
-	unsigned int  Threshold;
-	unsigned int  Max;
- 	unsigned char Prio;
-	unsigned char Status;
-	unsigned char Ready;
-	unsigned char Hysteresis;	
-	unsigned char Blocked;
-	unsigned char ManChange;
-		     long Amount;
+	uint16_t Val;
+	uint16_t Fill;
+	uint16_t LastFill;
+	uint16_t Threshold;
+	uint16_t Max;
+ 	uint8_t  Prio;
+	uint8_t  Status;
+	uint8_t  Ready;
+	uint8_t  Hysteresis;	
+	uint8_t  Blocked;
+	uint8_t  ManChange;
+	int32_t  Amount;
 }HOPPER;
 
 typedef struct COINStag{	//8
-	unsigned int  Count;
-	unsigned int  Credit;
-	         long Amount;
+	uint16_t  Count;
+	uint16_t  Credit;
+	int32_t   Amount;
 }COINS;
 
 typedef struct COIN_OVERRIDEtag
 {
-	unsigned char active;	//10
-	unsigned char Currency;	
-	unsigned int  Credit;
-	unsigned int  Value;
-			 long TotalValue;
+	uint8_t  active;	//10
+	uint8_t  Currency;	
+	uint16_t Credit;
+	uint16_t Value;
+	int32_t  TotalValue;
 }COIN_OVERRIDE;
 
 typedef struct BILL_OVERRIDEtag
 {
-	unsigned char active;	//14
-	unsigned char Currency;
-	unsigned long Credit;
-	unsigned long Value;
-			 long TotalValue;
+	uint8_t  active;	//14
+	uint8_t  Currency;
+	uint32_t Credit;
+	uint32_t Value;
+	int32_t  TotalValue;
 }BILL_OVERRIDE;
 
 typedef struct TOTAL_CURRENCYtag
 {
-			 long TotalCredit;
-			 long TotalValue;
+	int32_t TotalCredit;
+	int32_t TotalValue;
 }TOTAL_CURRENCY;
 
 typedef struct BILLStag{	//8
-	unsigned int  Count;
-	unsigned int  Credit;
-	         long Amount;
+	uint16_t Count;
+	uint16_t Credit;
+	int32_t  Amount;
 }BILLS;
 
 typedef struct TUBEStag{	//20
-	unsigned char Prio;
-	unsigned char Ready;
-	unsigned int  Val;
-	unsigned int  Fill;
-	unsigned int  LastFill;
-	unsigned int  Threshold;
-	unsigned int  Max;
-	unsigned char Hysteresis;
-	unsigned char ManChange;
-	unsigned char Deroute;
-	unsigned char avail;
-	         long Amount;
+	uint8_t  Prio;
+	uint8_t  Ready;
+	uint16_t Val;
+	uint16_t Fill;
+	uint16_t LastFill;
+	uint16_t Threshold;
+	uint16_t Max;
+	uint8_t  Hysteresis;
+	uint8_t  ManChange;
+	uint8_t  Deroute;
+	uint8_t  avail;
+	int32_t  Amount;
 }TUBES;
 
 

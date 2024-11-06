@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include "pico/util/queue.h"
 
 #include "lwip/udp.h"
 
@@ -124,12 +125,25 @@
 #define ICOM_MESSAGE_CRC_ERROR				0x5243
 #define ICOM_MESSAGE_CMD_QUEUE_ACK  		0x4151  //QA
 
+#define MAX_MESSAGE_LEN 119
+
+typedef struct __attribute__((packed)) ICOMmessage{
+    uint8_t  status;
+	uint16_t id;
+	uint16_t len;
+    uint32_t index;
+	uint8_t  Data[MAX_MESSAGE_LEN];
+}ICOM_MESSAGE;
+
+typedef __attribute__((aligned(1))) unsigned int unaligned_uint;
+typedef __attribute__((aligned(1))) unsigned short unaligned_ushort;
+
 /**
  * ----------------------------------------------------------------------------------------------------
  * Variables
  * ----------------------------------------------------------------------------------------------------
  */
-extern struct netif g_netif;
+//extern struct netif g_netif;
 struct udp_pcb *upcb;
 
 /**
@@ -137,9 +151,11 @@ struct udp_pcb *upcb;
  * Functions
  * ----------------------------------------------------------------------------------------------------
  */
-void udp_remoteServer_init(const struct ip4_addr *server_addr, uint16_t listenPort);
-static void udp_remoteServer_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port);
-static void udp_remoteServer_send(struct udp_pcb *upcb);
+void udp_intercom_init(const struct ip4_addr *server_addr, uint16_t listenPort);
+static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port);
+static void udp_intercom_send(struct udp_pcb *upcb);
 
+void intercomMessage_poll(void);
+void addMessage(uint16_t id, uint16_t len, uint8_t* data);
 
 #endif // _INTERCOM_H_

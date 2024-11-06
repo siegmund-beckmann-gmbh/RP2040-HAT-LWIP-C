@@ -303,7 +303,7 @@ int main()
 
     dns_init();
 
-    udp_remoteServer_init( IP4_ADDR_ANY, INTERCOM_CLIENT_PORT);
+    udp_intercom_init( IP4_ADDR_ANY, INTERCOM_CLIENT_PORT);
 
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_servermode_dhcp(1);
@@ -490,6 +490,7 @@ static void repeating_timer_10ms_callback(void)
     if ((rtc_cnt % 50)==0) {
         ReadTimeFromClock();
         timeRead = true;
+        intercomMessage_poll();
     }
 
     if (rtc_cnt & 0x01) {

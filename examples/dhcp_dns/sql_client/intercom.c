@@ -41,7 +41,22 @@ const unsigned int crctab[256] = {	//polynom 16.12.5.1 0x8404
 	0xF78F, 0xE606, 0xD49D, 0xC514, 0xB1AB, 0xA022, 0x92B9, 0x8330,
 	0x7BC7, 0x6A4E, 0x58D5, 0x495C, 0x3DE3, 0x2C6A, 0x1EF1, 0x0F78};
 
+#define MAX_MESSAGE_RECS 64
+ICOM_MESSAGE MessageList[MAX_MESSAGE_RECS];
+
 const char Intercom_Header[15] = {'B','e','C','k','M','a','N','n','_','R','e','M','o','T','e'};
+
+uint8_t IntercomPollCount  = 0;
+uint8_t MsgListBufIn	   = 0;
+uint8_t MsgListBufOut	   = 0;
+uint8_t MsgBufTimeout	   = 0;
+uint8_t MsgBufRepeat	   = 0;		
+
+struct ip4_addr callerIP;
+
+bool IntercomConnected = false;
+
+/* Functions */
 
 unsigned int CalcCRC(unsigned int StartVal, unsigned char *Buf, unsigned int len)
 {
@@ -77,24 +92,23 @@ crc = 0;
 }
 
 
-void udp_remoteServer_init(const struct ip4_addr *server_addr, uint16_t listenPort) 
+void udp_intercom_init(const struct ip4_addr *server_addr, uint16_t listenPort) 
 {
     void *passed_data = NULL;
     upcb = udp_new();
 
-    udp_recv(upcb, udp_remoteServer_received, passed_data);
+    udp_recv(upcb, udp_intercom_received, passed_data);
     udp_bind(upcb, server_addr, listenPort);    
-    
+
+	MsgBufTimeout		= 0;
+	MsgBufRepeat		= 0;					
 
 }
 
-static void udp_remoteServer_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port) 
+static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port) 
 {    
  unsigned char *rxpointer,*txpointer,*crcpointer,*datapointer;
  uint16_t cmd, check, rxlen, txlen; 
-
- typedef __attribute__((aligned(1))) unsigned int unaligned_uint;
- typedef __attribute__((aligned(1))) unsigned short unaligned_ushort;
 
  
     // Do something with the packet that was just received        
@@ -104,16 +118,17 @@ static void udp_remoteServer_received(void *passed_data, struct udp_pcb *upcb, s
     printf("Received data ! len=%d ip=%s port=%u\r\n", p->len, ip4addr_ntoa(addr), port );    
 
     hexdump(p->payload, p->len, 16, 8);
-	
+
+	IntercomPollCount = 0;
+	IntercomConnected = true;
+
 	rxpointer = p->payload;
 	txpointer = p->payload + sizeof(Intercom_Header);
 		
 	if (strncmp(rxpointer, &Intercom_Header[0], sizeof(Intercom_Header))==0)
 	{								
-  		//uip_udp_conns[ICOMconnection].ripaddr[0]=BUF->srcipaddr[0];	// Messages an anfragende IP
-  		//uip_udp_conns[ICOMconnection].ripaddr[1]=BUF->srcipaddr[1];
-		
-		//memcpy(&IntercomBuf[0],uip_appdata,uip_len);
+		memcpy(&callerIP, addr, sizeof(struct ip4_addr)); // for Messsages
+				
 		rxpointer += sizeof(Intercom_Header);
 				
 		cmd = *(unaligned_ushort *)rxpointer;
@@ -175,11 +190,127 @@ static void udp_remoteServer_received(void *passed_data, struct udp_pcb *upcb, s
 		}
 	}	
 
+			
+	if (strncmp(rxpointer,"ReSeT",5)==0)
+	{							
+		if (strncmp(rxpointer+5,"NeWiP",5)==0)
+		{
+
+		}
+	}
+
     pbuf_free(p);
 
 }
 
-static void udp_remoteServer_send(struct udp_pcb *upcb) 
+static void udp_intercom_send(struct udp_pcb *upcb) 
 {
+
+}
+
+/* MESSAGE INTERCOM SYSTEM PORT 1010*/
+
+void intercomMessage_poll(void) {
+
+uint32_t handle;
+unsigned char *rxpointer,*txpointer,*crcpointer;
+unsigned int cmd, check, rxlen, txlen, s;
+unsigned long index;
+
+uint8_t buf[256];
+
+	/* Check Timeouts for Offers */
+	if (++IntercomPollCount==10) {		
+		IntercomConnected = false;		
+		printf("InterCom Connection timed out!\r\n");
+	}		
+
+	if (IntercomConnected) 
+	{
+		// check for message in FIFO
+		printf("InterCom Connection check for message...\r\n");
+
+		if (MsgListBufIn != MsgListBufOut)
+		{	
+			txpointer = &buf[0];
+			memcpy(txpointer, Intercom_Header,sizeof(Intercom_Header));
+			txpointer += sizeof(Intercom_Header);
+
+			if (!MsgBufTimeout)
+			{				
+				if ( (MessageList[MsgListBufOut].len<=MAX_MESSAGE_LEN) && MessageList[MsgListBufOut].status)
+				{							
+					//Message senden
+					MsgBufTimeout = ICOM_TIMEOUT;
+
+					if (MessageList[MsgListBufOut].status == 1) 
+					{
+						MsgBufRepeat=ICOM_SEND_REPEAT;					
+						MessageList[MsgListBufOut].status = 2;
+					}
+								
+					crcpointer=txpointer;
+					*(unaligned_ushort *)txpointer = MessageList[MsgListBufOut].id;
+					txpointer+=2;					
+					*(unaligned_ushort *)txpointer = MessageList[MsgListBufOut].len + 4;
+					txpointer+=2;		
+					*(unsigned long *)txpointer = MessageList[MsgListBufOut].index;
+					txpointer+=4;
+
+					for (s=0;s<MessageList[MsgListBufOut].len;s++) *txpointer++= MessageList[MsgListBufOut].Data[s];
+						
+					txlen = txpointer-crcpointer;
+					//*(unsigned int far*)(crcpointer+2) = txlen-4;
+					*(unaligned_ushort *)txpointer = CalcCRC2(crcpointer,txlen);
+					txpointer+=2;										
+
+					printf("SENDING MESSAGE %04X Index=%08lX repeat=%u",MessageList[MsgListBufOut].id, MessageList[MsgListBufOut].index, MsgBufRepeat);
+				}
+				else 
+				{
+					printf("INVALID MESSAGE %04X",MessageList[MsgListBufOut].id);
+					if (++MsgListBufOut>=MAX_MESSAGE_RECS) MsgListBufOut=0;	//discard !!!	
+					MsgBufTimeout=0;
+					return;
+				}
+			}
+			else 
+			{
+				if (--MsgBufTimeout==0) 
+				{
+					if (MsgBufRepeat)
+					{
+						if (--MsgBufRepeat==0)
+						{
+							printf("DISCARDING MESSAGE %04X",MessageList[MsgListBufOut].id);
+							if (++MsgListBufOut>=MAX_MESSAGE_RECS) MsgListBufOut=0;	//discard !!!	
+							MsgBufTimeout=0;
+						}
+					}
+				}
+
+				return;
+			} 
+	
+			*(unaligned_ushort *)txpointer = ICOM_COMMAND_END;
+			txpointer+=2;		
+			txlen=txpointer - buf;
+
+			struct pbuf *p;    		
+        	p = pbuf_alloc(PBUF_RAW,txlen,PBUF_RAM);
+
+        	if (p != NULL) {
+            	pbuf_take(p,buf,txlen);
+				struct udp_pcb *mpcb = udp_new();
+				udp_sendto(mpcb, p, &callerIP, INTERCOM_MESSAGE_PORT);
+				pbuf_free(p);
+			}
+
+		} // queue is empty !
+	} // not connected !
+}
+
+
+void addMessage(uint16_t id, uint16_t len, uint8_t* data){
 
 }

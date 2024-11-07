@@ -31,7 +31,6 @@ static void pio_irq_func(void) {
     }
 }
 
-unsigned char SimpleMode=1;
 
 unsigned char MDB_timeout=0;
 unsigned char MDB_RETcount=0;	//ab V3.67
@@ -94,6 +93,10 @@ unsigned char LastSelHopperReady= 0;
 unsigned char SelHopperBlocked	= 0;
 unsigned char SelHopperPrio		= 0;
 
+bool InsertEnable = false;
+
+uint16_t SystemConfig = 0;
+
 //-----------------------------FUNCTIONS--------------------------------------
 
 void putMDBevent(MDB_EVENT *event ) {
@@ -111,18 +114,13 @@ void EnableCoins(unsigned int enable)
     {		 
      	if (!MDB_Emp.Problem) 
 		{
-			InsertEnable=1;			
-     		CheckCoinToMain();
-			if (!SimpleMode) IlluminateCoinInsert(1); 
+			InsertEnable=true;			
+     		CheckCoinToMain();			
 		}
 			
      	MDB_Emp.NewRequest=CmdEmp_CoinType;
     }
-    else 
-	{
-		InsertEnable=0;	
-		if (!SimpleMode) IlluminateCoinInsert(0);
-	}
+    else InsertEnable=false;
 	#endif	
 
 	#if (TUBE_CHANGER==1)    
@@ -133,15 +131,10 @@ void EnableCoins(unsigned int enable)
 	 	 	 
     if (MDB_Changer1.CoinEnable && MDB_Changer1.ready && (!MDB_Changer1.Problem))
 	{
-     	//InsertEnable=1;
-		CheckCoinToMain();
-		//if (!SimpleMode) IlluminateCoinInsert(1);
+     	InsertEnable=true;
+		CheckCoinToMain();		
 	}
-    else 
-	{
-		//InsertEnable=0;	
-		//if (!SimpleMode) IlluminateCoinInsert(0);
-	}
+    else InsertEnable=false;
 	#endif		
 }
 
@@ -157,7 +150,7 @@ void EnableManualDispense(unsigned int enable)
 
 void EnableIllumination()
 {
-    // AusgabeLeuchte = 1;
+	AusgabeLeuchte = true;
 }
 
 
@@ -167,25 +160,20 @@ void EnableBills(unsigned int enable)
 	
 	MDB_Validator.BillEnable=enable;
 	
-	//sprintf(str,"Bill Enable received %u",MDB_Validator.BillEnable);
-	//Output_Logfile(str, DEFAULT_LOG);	
+	printf("Bill Enable received %u",MDB_Validator.BillEnable);
 	
 	if (enable)
 	{
      	MDB_Validator.Inhibit=0;
 	 	MDB_Validator.Inhibited=1;
-     	//if (MDB_Validator.ready) 
-		 //if (!SimpleMode) IlluminateBillInsert(1);     
 	}
 	else
 	{
      	MDB_Validator.Inhibit=1;
 	 	MDB_Validator.Inhibited=0;
-     	//if (MDB_Validator.ready)
-		 //if (!SimpleMode) IlluminateBillInsert(0);		
 	}
 	
-	// if (SysVar.BillEscrowMode==0) MDB_Changer1.NewRequest=CmdValidator_BillType;
+	MDB_Changer1.NewRequest=CmdValidator_BillType;
 }     
 
 void ToggleInhibit(void)
@@ -549,8 +537,7 @@ void InitMDB(void)
  	{
 		if (SysVar.Hopper[s].LastFill!=SysVar.Hopper[s].Fill)
 		{
-			//sprintf(str,"WARNING: Memory altered for Hopper%u LastFill=%05u Fill=%05u !",s,SysVar.Hopper[s].LastFill,SysVar.Hopper[s].Fill);
-			//Output_Logfile(str, DEFAULT_LOG);
+			printf("WARNING: Memory altered for Hopper%u LastFill=%05u Fill=%05u !",s,SysVar.Hopper[s].LastFill,SysVar.Hopper[s].Fill);
 		}
 		
  		SysVar.Hopper[s].LastFill=SysVar.Hopper[s].Fill;
@@ -1188,6 +1175,10 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 
 	  MDB_Changer->ready=1;
 	  MDB_Changer->Sequence=0;	  
+
+	  if (MDB_Changer == pMDB_Changer2) 
+	  	   SystemConfig |=0x04;
+	  else SystemConfig |=0x04;
 	  		
 	  break; 	    		
 	  
@@ -1861,7 +1852,7 @@ void RX_Handle_Cardreader(unsigned char buff_point)
 	//  break;
 	case CmdCardreader_ReaderEnable :
 	  //MDB_Cardreader.ready=1;		  	  	  
-	  // SystemConfig |=0x08;
+	  //SystemConfig |=0x08;
 	  break;
 	case CmdCardreader_ReaderCancel :
 	  Handle_Cardreader_Status(0,buff_point);		// Cancelled expected 
@@ -2129,7 +2120,8 @@ unsigned char Handle_Cardreader_Status(unsigned char buffpos,unsigned char buffl
 		  	MDB_Cardreader.NextRequest=CmdCardreader_ReaderEnable;		  
 	  }
 	  
-	  MDB_Cardreader.ready=1;		  	  	  
+	  MDB_Cardreader.ready=1;		
+	  SystemConfig |=0x08;  	  	  
 	  
 
 	  	// Hier Ready Event
@@ -2319,12 +2311,9 @@ void RX_Handle_Validator(unsigned char buff_point)
 				  		p=s;
 						while (p--) BillBitmask= BillBitmask<<1;
 						
-						//sprintf(str,"Bill ESCROW Bill Enable= %u Bitmask=%u",MDB_Validator.BillEnable,BillBitmask);
-						//Output_Logfile(str, DEFAULT_LOG);							
+						printf("Bill ESCROW Bill Enable= %u Bitmask=%u",MDB_Validator.BillEnable,BillBitmask);
 		          		
-						if ( (!SimpleMode && (MDB_Validator.NoteValue>=MDB_Validator.AKZ_Min) && (MDB_Validator.NoteValue<=MDB_Validator.AKZ_Max) && 
-		                    ValidatorNotesEN[MDB_Validator.Status[s] & 0x0F]) ||
-						   (SimpleMode && (MDB_Validator.BillEnable & BillBitmask)) )
+						if (MDB_Validator.BillEnable & BillBitmask) 
 		            	{
 		              	
 		                	if(MDB_Validator.Inhibit==1) 
@@ -2454,11 +2443,6 @@ void RX_Handle_Validator(unsigned char buff_point)
 							MDB_Validator.EscrowStatus=0;	//ab 09.01.2006 V1.30
 					break;
 					case 0x09://0x09 = Unit Disabled		                  	
-						if (SysVar.BillEscrowMode) 
-						{
-		                  if (MDB_Validator.EscrowStatus==1)
-		                   MDB_Validator.EscrowTimeout=Validator_EscrowTime;
-						}
 					break;
 					case 0x0A://0x0A = Invalid Escrow request (when no Bill in Escrow position)
 					break;
@@ -2488,33 +2472,7 @@ void RX_Handle_Validator(unsigned char buff_point)
 	        } //von for
 	     } 
 	     else //von buff_point>1   
-	     {
-		   	if (SysVar.BillEscrowMode) 
-		   	{
-	     		if (!MDB_Validator.EscrowTimeout && (MDB_Validator.EscrowStatus))	//keine Bestaetigung f�r Banknote erhalten
-	     		{				
-					if (strcmp(MDB_Validator.Manufacturer,"CCC"))
-					{
-			      	  	SysVar.Bill[MDB_Validator.EscrowChannel].Count++;
-			      	  	MDB_Validator.EscrowStatus=0;
-				  	
-						//CalcCoinCRC(); //V1.25
-															
-				   	  	MDBEvent.Type    = EvTypeMDB_BillEscrowTimeout;			// MDBEvent
-		   	   		  	MDBEvent.Length  = 8;
-		   	   		  	MDBEvent.Data[0] = MDB_Validator.NoteValue;
-		   	   		  	MDBEvent.Data[1] = MDB_Validator.NoteValue>>8;
-	   	   		      	MDBEvent.Data[2] = MDB_Validator.NoteValue>>16;
-	   	   		      	MDBEvent.Data[3] = MDB_Validator.NoteValue>>24;				  
-		   	   		  	MDBEvent.Data[4] = MDB_Validator.LastStatus;
-		   	   		  	MDBEvent.Data[5] = MDB_Validator.LastRequest;
-		   	   		  	MDBEvent.Data[6] = MDB_Validator.LastRequest>>8;
-						MDBEvent.Data[7] = MDB_Validator.EscrowChannel;
-		   	   		  	putMDBevent(&MDBEvent);
-					}
-				}
-			}  	
-			
+	     {			
 			MDB_Validator.LastStatus=0;	//nur ACK
 	     }	
 	   // ***************** INHIBIT ANALYSE ******************
@@ -2533,13 +2491,7 @@ void RX_Handle_Validator(unsigned char buff_point)
         	}
             else
             {
-				if (SysVar.BillEscrowMode) 
-				{
-	       			MDB_Validator.BillEnable=0xFFFF;		//Freigeben
-     	       		MDB_Validator.BillEscrowEnable=0xFFFF;
-				}
-				else MDB_Validator.BillEscrowEnable=0x0000;
-				
+				MDB_Validator.BillEscrowEnable=0x0000;				
                	MDB_Validator.NextRequest=CmdValidator_BillType;  	
             }
         
@@ -2552,6 +2504,7 @@ void RX_Handle_Validator(unsigned char buff_point)
 	    		 MDB_Validator.Inhibited=1;
 	    	else MDB_Validator.Inhibited=0;
 	  		MDB_Validator.ready=1;	    
+			SystemConfig |=0x02;
           	MDB_Validator.NextRequest=CmdValidator_Poll;
 		break; 	    		
      	case CmdValidator_Escrow :
@@ -4256,8 +4209,7 @@ void SetAKZmax(uint32_t pay, uint8_t changemode)
 
  	if (MDB_Validator.AKZ_Max==0) 
  	{
- 		//if (MDB_Validator.ready) 
-		 //if (!SimpleMode) IlluminateBillInsert(0);
+ 		//if (MDB_Validator.ready) 		 
  		EnableBills(0);
  	}
 
@@ -4266,8 +4218,7 @@ void SetAKZmax(uint32_t pay, uint8_t changemode)
  	{
 		if (ToPay==0) 
 		{		
-			if (MDB_Emp.ready && (!MDB_Emp.Problem))
- 			if (!SimpleMode) IlluminateCoinInsert(0);
+			if (MDB_Emp.ready && (!MDB_Emp.Problem)) 			
  			EnableCoins(0x0000);
 		}
  	}
@@ -4281,8 +4232,7 @@ void SetAKZmax(uint32_t pay, uint8_t changemode)
 		/*
 		if (ToPay==0) 
 		{		
-			if (MDB_Changer1.ready && !MDB_Changer1.Problem) 
-			 if (!SimpleMode) IlluminateCoinInsert(0);
+			if (MDB_Changer1.ready && !MDB_Changer1.Problem) 			 
  			EnableCoins(0x0000);
 		}
 		*/

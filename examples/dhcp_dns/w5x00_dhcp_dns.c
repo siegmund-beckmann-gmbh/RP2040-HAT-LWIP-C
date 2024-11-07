@@ -65,14 +65,14 @@
 
 /* Network */
 extern uint8_t mac[6];
-pico_unique_board_id_t SystemID;
+extern pico_unique_board_id_t SystemID;
 
 /* LWIP */
 struct netif g_netif;
 
 /* DNS */
 static uint8_t g_dns_target_domain[] = "_postgresql._tcp.local";
-static uint8_t g_dns_get_ip_flag = 1;
+static uint8_t g_dns_get_ip_flag = 0;
 static uint32_t g_ip;
 
 static ip_addr_t default_ip;
@@ -302,12 +302,12 @@ int main()
     dhcp_start(&g_netif);
 
     dns_init();
-
-    udp_intercom_init( IP4_ADDR_ANY, INTERCOM_CLIENT_PORT);
-
+    
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_servermode_dhcp(1);
     sntp_init();
+
+    udp_intercom_init();
 
     /* Infinite loop */
     while (1)
@@ -342,11 +342,11 @@ int main()
             }
         }
 
-        if (g_dns_get_ip_flag == 0) {            
+        if (g_dns_get_ip_flag > 1) {            
 
             status = dns_gethostbyname(g_dns_target_domain, &g_resolved, NULL, NULL);
-
-            if (status == ERR_OK)
+            
+            if (status == ERR_OK) 
             {
                 g_ip = g_resolved.addr;
 
@@ -414,10 +414,12 @@ int main()
                 printf("KEY fifo empty");
             }   
             
+            
             switch (evKey.Type)
             {
             case EvTypeKey_Pressed:
                 printf("KEY %d pressed!\n", evKey.Data[0]);
+                addMessage(ICOM_MESSAGE_KEY_PRESSED,1,&evKey.Data[0]);
                 if (evKey.Data[0] == 8) trayLight = !trayLight;
                 if (evKey.Data[0] == 9) directEntry = !directEntry;
                 if (evKey.Data[0] == 10) directSignal = !directSignal;
@@ -426,6 +428,7 @@ int main()
             break;
             case EvTypeKey_Released:
                 printf("KEY %d released!\n", evKey.Data[0]);
+                addMessage(ICOM_MESSAGE_KEY_RELEASED,1,&evKey.Data[0]);
             break;
             default:
                 printf("KEY Event %d Length %d\n", evKey.Type, evKey.Length);
@@ -463,7 +466,10 @@ void my_netif_status_callback(struct netif *netif)
 {
     printf("netif status changed %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
 
-    g_dns_get_ip_flag=0;
+    if (!ip4_addr_isany_val(*netif_ip4_addr(netif))) {
+        g_dns_get_ip_flag=2;    
+        printf(" mDNS getting postgresql-host...\n");
+    }
 }
 
 void putKeyEvent(KEY_EVENT *event ) {
@@ -477,7 +483,8 @@ void putKeyEvent(KEY_EVENT *event ) {
 /* Timer */
 static void repeating_timer_1ms_callback(void)
 {            
-    if (g_dns_get_ip_flag) handleMDBtimer();
+    //if (g_dns_get_ip_flag == 1) 
+    handleMDBtimer();
 
     if (++msec_cnt > 19) msec_cnt=0;
 

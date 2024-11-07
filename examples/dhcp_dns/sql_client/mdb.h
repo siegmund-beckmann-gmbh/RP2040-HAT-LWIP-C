@@ -188,7 +188,9 @@ typedef struct SAVEVARtag{
 			 long		ChangeBaseAmount;			//1806 V4.06			 
 	unsigned char		AcceptAllBills;				//1810 V4.09
 										
-	unsigned char		BillEscrowMode;				//1842
+	unsigned char		DirEntryTimeout;
+	unsigned char		DirEntryPause;
+	unsigned char		DirEntryRepeat;
 										
 	unsigned int		checksum;				
 
@@ -623,6 +625,8 @@ void CheckHopperFill();
 void CheckCoinToMain();
 
 void putMDBevent(MDB_EVENT *event);
+
+extern bool AusgabeLeuchte;
 
 #endif /* MDB_H */
 // -----------------------------------------------------------------------------------

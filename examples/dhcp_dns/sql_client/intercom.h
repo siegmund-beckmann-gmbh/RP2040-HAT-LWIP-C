@@ -8,8 +8,12 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include "pico/util/queue.h"
+#include "pico/unique_id.h"
 
 #include "lwip/udp.h"
+
+#include "mdb.h"
+#include "illumination.h"
 
 /**
  * ----------------------------------------------------------------------------------------------------
@@ -55,11 +59,7 @@
 #define ICOM_COMMAND_MDB_BILL_CONFIG		0x4342
 #define	ICOM_COMMAND_MDB_HOPPER_CONFIG		0x4348
 #define	ICOM_COMMAND_MDB_READER_CONFIG		0x4352
-#define ICOM_COMMAND_CARDSYSTEM				0x5343
 #define ICOM_COMMAND_RGBANI					0x4E41
-#define ICOM_COMMAND_EC_PAYMENT				0x5045
-#define ICOM_COMMAND_EC_REVERSE				0x5245
-#define ICOM_COMMAND_EC_TERMINAL			0x5445
 #define ICOM_COMMAND_CARDREADER_PAYMENT		0x5043
 #define ICOM_COMMAND_CARDREADER_ENABLE		0x4543
 #define ICOM_COMMAND_CARDREADER_DENY		0x4443
@@ -83,14 +83,11 @@
 #define ICOM_MESSAGE_BILL_ACCEPTED			0x4142
 #define ICOM_MESSAGE_BILL_REJECTED			0x5242
 #define ICOM_MESSAGE_BILL_STACKED			0x5342
-#define ICOM_MESSAGE_CP4_EVENT				0x3443
-#define ICOM_MESSAGE_CP3_EVENT				0x3343
 #define ICOM_MESSAGE_COIN_ACCEPTED			0x4143
 #define ICOM_MESSAGE_COIN_DISPENSED			0x4443
 #define ICOM_MESSAGE_COIN_STATUS			0x5343
 #define ICOM_MESSAGE_CHANGER_ERROR			0x4543
 #define ICOM_MESSAGE_CFCARD					0x4643
-#define ICOM_MESSAGE_CP4_CARD_READY			0x3452
 #define ICOM_MESSAGE_DISPENSER_STATUS		0x5344
 #define ICOM_MESSAGE_CARDREADER_ACCEPTED	0x4147
 #define ICOM_MESSAGE_CARDREADER_DENIED      0x4456
@@ -135,25 +132,60 @@ typedef struct __attribute__((packed)) ICOMmessage{
 	uint8_t  Data[MAX_MESSAGE_LEN];
 }ICOM_MESSAGE;
 
+typedef __attribute__((aligned(1))) unsigned long unaligned_ulong;
 typedef __attribute__((aligned(1))) unsigned int unaligned_uint;
 typedef __attribute__((aligned(1))) unsigned short unaligned_ushort;
+
+typedef struct __attribute__((packed)) APPtag{
+	unsigned char ID[3];
+    unsigned char Name[16];
+    unsigned char VerInfo[20];
+	unsigned int  Version;
+}APP;
 
 /**
  * ----------------------------------------------------------------------------------------------------
  * Variables
  * ----------------------------------------------------------------------------------------------------
  */
+extern SAVEVARS	SysVar;
+
+extern struct COIN_OVERRIDEtag	CoinOver[16];
+extern struct BILL_OVERRIDEtag BillOver[16];
+
+extern EmpTag MDB_Emp;
+
+extern ChangerTag MDB_Changer1;
+extern ChangerTag MDB_Changer2;
+
+extern CardreaderTag MDB_Cardreader;
+extern ValidatorTag MDB_Validator;
+extern AVDTag MDB_AVD;
+extern PARKIOTag MDB_ParkIO;
+
+extern TubeCfg PayOutTubes[32];
+
+extern unsigned char ValidatorNotesEN[MDB_MAXNOTES];
+extern unsigned char EmpCoinsEN[MDB_MAXCOINS];
+
+extern unsigned long MDB_ChangerTotal;
+
+extern uint16_t SystemConfig;
+
+extern unsigned char FRONTRGB_Ani[MAX_PCA];
+
 //extern struct netif g_netif;
 struct udp_pcb *upcb;
+struct udp_pcb *mpcb;
 
 /**
  * ----------------------------------------------------------------------------------------------------
  * Functions
  * ----------------------------------------------------------------------------------------------------
  */
-void udp_intercom_init(const struct ip4_addr *server_addr, uint16_t listenPort);
+void udp_intercom_init(void);
 static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port);
-static void udp_intercom_send(struct udp_pcb *upcb);
+static void udp_message_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port);
 
 void intercomMessage_poll(void);
 void addMessage(uint16_t id, uint16_t len, uint8_t* data);

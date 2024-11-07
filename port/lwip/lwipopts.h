@@ -48,6 +48,7 @@
 #define LWIP_DNS_SUPPORT_MDNS_QUERIES 1
 
 #define MEMP_NUM_SYS_TIMEOUT            (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 10)
+#define MEMP_NUM_UDP_PCB  6
 
 // disable ACD to avoid build errors
 // http://lwip.100.n7.nabble.com/Build-issue-if-LWIP-DHCP-is-set-to-0-td33280.html

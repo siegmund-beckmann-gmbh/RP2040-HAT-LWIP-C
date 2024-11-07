@@ -2,6 +2,13 @@
 
 #include "hexdump.h"
 
+const APP MyApplication={
+    "APF",
+    "Phoenix-RemoteII",
+    "Ver 1.00 07.11.2024",
+    100    
+};
+
 /* ============================================================================================ *
  * routines for CRC										*
  * Program-File											* 
@@ -50,11 +57,21 @@ uint8_t IntercomPollCount  = 0;
 uint8_t MsgListBufIn	   = 0;
 uint8_t MsgListBufOut	   = 0;
 uint8_t MsgBufTimeout	   = 0;
-uint8_t MsgBufRepeat	   = 0;		
+uint8_t MsgBufRepeat	   = 0;
+
+uint16_t indexCounter = 0;
 
 struct ip4_addr callerIP;
 
 bool IntercomConnected = false;
+
+bool crc_error = false;
+
+bool AusgabeLeuchte = false;
+bool DirektEintritt = false;
+bool EintrittSignal = false;
+
+pico_unique_board_id_t SystemID;
 
 /* Functions */
 
@@ -92,30 +109,48 @@ crc = 0;
 }
 
 
-void udp_intercom_init(const struct ip4_addr *server_addr, uint16_t listenPort) 
+void udp_intercom_init() 
 {
     void *passed_data = NULL;
     upcb = udp_new();
+	mpcb = udp_new();
 
     udp_recv(upcb, udp_intercom_received, passed_data);
-    udp_bind(upcb, server_addr, listenPort);    
+    udp_bind(upcb, IP4_ADDR_ANY, INTERCOM_CLIENT_PORT);    
+	
+	udp_recv(mpcb, udp_message_received, passed_data);
+	udp_bind(mpcb, IP4_ADDR_ANY, INTERCOM_MESSAGE_PORT);    
+
+	for (int cl=0;cl<MAX_MESSAGE_RECS;cl++)
+	{
+		MessageList[cl].status=0;
+		MessageList[cl].id=ICOM_COMMAND_END;
+		MessageList[cl].index=0;
+	}
 
 	MsgBufTimeout		= 0;
-	MsgBufRepeat		= 0;					
+	MsgBufRepeat		= 0;
+	MsgListBufIn		= 0;
+	MsgListBufOut		= 0;
 
 }
 
 static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port) 
 {    
  unsigned char *rxpointer,*txpointer,*crcpointer,*datapointer;
- uint16_t cmd, check, rxlen, txlen; 
 
+ uint16_t cmd, ccmd, check, rxlen, txlen, s,taglen,count,k, OpenOptions;
+ uint8_t cf_byte,tag,testmode,ani,aniadr,chn,ectype,Derr;
+ uint32_t amount, UUID0,UUID1,UUID2,UUID3;
+ char str[64];
+ uint8_t by1,by2,by3;
+ uint16_t h,i;
  
     // Do something with the packet that was just received        
 
     if(p == NULL) return;
 
-    printf("Received data ! len=%d ip=%s port=%u\r\n", p->len, ip4addr_ntoa(addr), port );    
+    printf("ICOM_PORT Received data ! len=%d ip=%s port=%u\r\n", p->len, ip4addr_ntoa(addr), port );    
 
     hexdump(p->payload, p->len, 16, 8);
 
@@ -141,8 +176,6 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 			check = *(unaligned_ushort *)(rxpointer + rxlen + 2);			
 			rxpointer+=2;  // Pointer auf Datenbeginn
 			datapointer=rxpointer;
-
-            //printf("ICOM_COMMAND = %04X LENGTH=%04X CRC=%04X\r\n", cmd, rxlen, check );    
 			
 			if (check==CalcCRC2(crcpointer,rxlen+4))
 			{			
@@ -168,8 +201,683 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 				
 				case ICOM_COMMAND_GET_TIME:
 				break;
-                }
 
+				case ICOM_COMMAND_BILL_STATUS:
+					// Banknoten	
+					if (!crc_error) 
+					{
+						for (s=0;s<MDB_MAXNOTES;s++) 
+						{
+							*(unaligned_ushort *)txpointer=SysVar.Bill[s].Count;
+							txpointer+=2;
+						}				
+					}
+					else *(unaligned_ushort *)(txpointer-4) = 0xFFFF;
+				break;
+				case ICOM_COMMAND_COIN_STATUS:
+					if (!crc_error) 
+					{				
+						for (s=0;s<MDB_MAXCOINS;s++) 
+						{
+						  	for (k=0;k<MDB_MAXCOINS;k++)
+							 if (MDB_Changer1.PhysTubes[k]==s) break;
+						 
+							if (k<MDB_MAXCOINS) 
+							{
+								if (SysVar.Tube[k].Deroute)			
+								{	
+									if (SysVar.Tube[k].Deroute<=MAX_HOPPER)
+									 	 *(unaligned_ushort *)txpointer=SysVar.Hopper[SysVar.Tube[k].Deroute-1].Fill;
+									else *(unaligned_ushort *)txpointer=0;
+								}
+								else *(unaligned_ushort *)txpointer=MDB_Changer1.TubeStatus[s];
+							}
+							else *(unaligned_ushort *)txpointer=MDB_Changer1.TubeStatus[s];
+						
+							txpointer+=2;									
+						}				
+					
+						if (MDB_Changer1.Problem==6) // cassette removed
+						     *(unaligned_ushort *)txpointer++=1;
+						else *(unaligned_ushort *)txpointer++=0;						
+					}
+					else *(unaligned_ushort *)(txpointer-4) = 0xFFFF;										
+				break;
+				case ICOM_COMMAND_TUBE_STATUS:				
+					for (s=0;s<MDB_MAXCOINS;s++) 
+					{
+					  	for (k=0;k<MDB_MAXCOINS;k++)
+						 if (MDB_Changer1.PhysTubes[k]==s) break;
+						 
+						if (k<MDB_MAXCOINS) 
+						{
+							if (SysVar.Tube[k].Deroute)			
+							{	
+								if (SysVar.Tube[k].Deroute<=MAX_HOPPER)
+								 	 *(unaligned_ushort *)txpointer=SysVar.Hopper[SysVar.Tube[k].Deroute-1].Fill;
+								else *(unaligned_ushort *)txpointer=0;
+							}
+							else *(unaligned_ushort *)txpointer=SysVar.Tube[s].Fill;							
+						}
+						else *(unaligned_ushort *)txpointer=SysVar.Tube[s].Fill;
+						
+						txpointer+=2;									
+					}				
+				
+				break;
+				case ICOM_COMMAND_HOPPER_STATUS:				
+					if (!crc_error) 
+					{
+						for (s=0;s<MAX_HOPPER;s++) 
+						{
+							*(unaligned_ushort *)txpointer=SysVar.Hopper[s].Fill;
+							txpointer+=2;									
+						}				
+					
+						for (s=0;s<MAX_HOPPER;s++) 					
+						{
+							if (SysVar.Hopper[s].Blocked)
+								 *txpointer++=(SysVar.Hopper[s].Status | 0x80);
+							else *txpointer++=SysVar.Hopper[s].Status;
+						}
+					}
+					else *(unaligned_ushort *)(txpointer-4) = 0xFFFF;
+					
+				break;
+				
+				case ICOM_COMMAND_CASHBOX_STATUS:				
+					if (!crc_error) 
+					{
+						for (s=0;s<MDB_MAXCOINS;s++) 
+						{
+							*(unaligned_ushort *)txpointer=SysVar.Coin[s].Count;
+							txpointer+=2;									
+						}								
+					}
+					else *(unaligned_ushort *)(txpointer-4) = 0xFFFF;
+				break;
+
+				case ICOM_COMMAND_CLEAR_HOPPER:
+					*(unaligned_ushort *)txpointer = 0x0000;
+					
+					chn=*(unsigned char *)rxpointer;
+
+					if (!SysVar.Hopper[(chn & 0x0F)].Blocked)
+					{
+						MDB_Changer2.Payout = chn;
+						MDB_Changer2.NewRequest = CmdChanger_ExpPayout;
+						MDB_Changer2.NewSequence=0;
+						SysVar.Hopper[chn].Ready=0;
+					}
+					else *(unaligned_ushort *)txpointer = 0xFFFF;
+															
+					txpointer+=2;
+					
+					//CalcCoinCRC();
+				break;
+				
+				case ICOM_COMMAND_CHANGER_TOTAL:
+					DispenseAmount(10,1); 	// MDB_ChangerTotal berechnen
+					*(unaligned_ulong *)txpointer =MDB_ChangerTotal;
+					txpointer+=4;
+					*(unaligned_ulong *)txpointer =MDB_Changer1.ChangerAmount;
+					txpointer+=4;
+					*(unaligned_ulong *)txpointer =MDB_Changer2.ChangerAmount;
+					txpointer+=4;
+				break;
+								
+				case ICOM_COMMAND_GET_TUBE_ROUTING:
+					for (s=0;s<MDB_MAXCOINS;s++)
+					{
+					  	for (k=0;k<MDB_MAXCOINS;k++)
+						 if (MDB_Changer1.PhysTubes[k]==s) break;
+						 
+						if (k<MDB_MAXCOINS) 
+						{
+							*txpointer++=SysVar.Tube[k].Deroute;
+						}
+						else *txpointer++=0;												 
+					}					 
+				break;
+				
+				case ICOM_COMMAND_SET_TUBE_ROUTING:
+					for (s=0;s<MDB_MAXCOINS;s++) 
+					{
+					  	for (k=0;k<MDB_MAXCOINS;k++)
+						 if (MDB_Changer1.PhysTubes[k]==s) break;
+						 
+						if (k<MDB_MAXCOINS) 
+						{						
+							SysVar.Tube[k].Deroute=*datapointer++;
+							*txpointer++=SysVar.Tube[k].Deroute;
+						}
+						else *txpointer++=*datapointer++;
+					}				
+										
+					//writeConfigFile(); // V1.38	
+					//CalcCoinCRC(); //V1.29
+				break;
+				
+				case ICOM_COMMAND_CMD_SET_OUTPUTS:	// V1.24
+				
+					chn=*(unsigned char *)rxpointer & 0x03;
+					h = 0x0001 << chn;
+					if (*(unsigned char *)(rxpointer+1)) 
+					{
+						// set Relais
+						MDB_Changer2.ManualDispenseEnable = (MDB_Changer2.ManualDispenseEnable | h); 
+						//RelaisStat[chn]=1;
+					}
+					else
+					{
+						// clr Relais
+						MDB_Changer2.ManualDispenseEnable = (MDB_Changer2.ManualDispenseEnable & ~h);
+						//RelaisStat[chn]=0;				
+					}		
+					
+				     MDB_Changer2.NewSequence=Changer_Sequence_COINTYPE;	//002
+				     MDB_Changer2.NewRequest=CmdChanger_CoinType;
+							
+				break;
+				
+				case ICOM_COMMAND_CMD_SET_LIGHT:
+					chn=*(unsigned char *)rxpointer;
+					if (chn!=0) 
+						 AusgabeLeuchte = true;
+					else AusgabeLeuchte = false;					
+				break;
+				case ICOM_COMMAND_CMD_SET_DIRECT:
+					chn=*(unsigned char *)rxpointer;
+					if (chn!=0) 
+						 DirektEintritt = true;
+					else DirektEintritt = false;					
+				break;
+				case ICOM_COMMAND_CMD_SET_EXTRA:
+					chn=*(unsigned char *)rxpointer;
+					if (chn!=0) 
+						 EintrittSignal = true;
+					else EintrittSignal = false;									
+				break;
+
+				case ICOM_COMMAND_GET_PRIORIETIES:	//Für DISPENSE_AMOUNT
+					for (s=0;s<MDB_MAXCOINS;s++)
+					{
+					  	for (k=0;k<MDB_MAXCOINS;k++)
+						 if (MDB_Changer1.PhysTubes[k]==s) break;
+						 
+						if (k<MDB_MAXCOINS) 
+						{
+							*txpointer++=SysVar.Tube[k].Prio;
+						}
+						else *txpointer++=0;												 
+					}
+					
+					for (s=0;s<MAX_HOPPER;s++) *txpointer++=SysVar.Hopper[s].Prio;
+				break;
+				
+				case ICOM_COMMAND_SET_PRIORIETIES:				
+					for (s=0;s<MDB_MAXCOINS;s++) 
+					{
+					  	for (k=0;k<MDB_MAXCOINS;k++)
+						 if (MDB_Changer1.PhysTubes[k]==s) break;
+						 
+						if (k<MDB_MAXCOINS) 
+						{						
+							SysVar.Tube[k].Prio=*datapointer++;
+							*txpointer++=SysVar.Tube[k].Prio;
+						}
+						else *txpointer++=*datapointer++;						
+					}
+					for (s=0;s<MAX_HOPPER;s++)
+					{
+						SysVar.Hopper[s].Prio=*datapointer++;
+						*txpointer++=SysVar.Hopper[s].Prio;
+					}				
+					
+					//writeConfigFile(); // V1.38	
+					//CalcCoinCRC(); //V1.29
+				break;				
+				
+				case ICOM_COMMAND_BILL_FILL:
+					for (s=0;s<MDB_MAXNOTES;s++) 
+					{
+						SysVar.Bill[s].Count=*(unaligned_ushort *)datapointer;
+						datapointer+=2;									
+						
+						*(unaligned_ushort *)txpointer=SysVar.Bill[s].Count;
+						txpointer+=2;									
+					}		
+					
+					//CalcCoinCRC(); //V1.25				
+				break;
+				case ICOM_COMMAND_TUBE_FILL:
+					for (s=0;s<MDB_MAXCOINS;s++) 
+					{						
+					  	for (k=0;k<MDB_MAXCOINS;k++)
+						 if (MDB_Changer1.PhysTubes[k]==s) break;
+						 
+						if (k<MDB_MAXCOINS) 
+						{						
+							SysVar.Tube[k].Fill=*(unaligned_ushort *)datapointer;
+							SysVar.Tube[k].LastFill=*(unaligned_ushort *)datapointer;
+							*(unaligned_ushort *)txpointer=SysVar.Tube[k].Fill;
+						}
+						else
+						{
+							*(unaligned_ushort *)txpointer=0;
+						}
+						
+						datapointer+=2;															
+						txpointer+=2;															
+					}													
+					
+				break;
+				case ICOM_COMMAND_HOPPER_FILL:
+					for (s=0;s<MAX_HOPPER;s++) 
+					{
+						SysVar.Hopper[s].Fill=*(unaligned_ushort *)datapointer;
+						SysVar.Hopper[s].LastFill=*(unaligned_ushort *)datapointer;
+						datapointer+=2;									
+						
+						*(unaligned_ushort *)txpointer=SysVar.Hopper[s].Fill;
+						txpointer+=2;									
+					}								
+					
+					for (s=0;s<MAX_HOPPER;s++) 					
+					{
+						if (SysVar.Hopper[s].Blocked)
+							 *txpointer++=(SysVar.Hopper[s].Status | 0x80);
+						else *txpointer++=SysVar.Hopper[s].Status;
+					}
+				
+					//CalcCoinCRC(); //V1.25					
+				break;
+				case ICOM_COMMAND_HOPPER_VALUES:
+					for (s=0;s<MAX_HOPPER;s++) 
+					{
+						SysVar.Hopper[s].Val=*(unaligned_ushort *)datapointer;
+						datapointer+=2;									
+						
+						*(unaligned_ushort *)txpointer=SysVar.Hopper[s].Fill;
+						txpointer+=2;									
+					}								
+					
+					for (s=0;s<MAX_HOPPER;s++) 					
+					{
+						if (SysVar.Hopper[s].Blocked)
+							 *txpointer++=(SysVar.Hopper[s].Status | 0x80);
+						else *txpointer++=SysVar.Hopper[s].Status;
+					}
+					
+					//CalcCoinCRC(); //V1.25					
+				break;				
+				case ICOM_COMMAND_CASHBOX_FILL:
+					for (s=0;s<MDB_MAXCOINS;s++) 
+					{
+						SysVar.Coin[s].Count=*(unaligned_ushort *)datapointer;
+						datapointer+=2;									
+						
+						*(unaligned_ushort *)txpointer=SysVar.Coin[s].Count;
+						txpointer+=2;									
+					}								
+					
+					crc_error=0;
+					//CalcCoinCRC(); //V1.25					
+				break;
+				case ICOM_COMMAND_GENERAL_STATUS:
+					check=SystemConfig & 0x0F;
+					
+					//if (CRTSCD_ready)  check |=0x10;
+																				
+					*(unaligned_ushort *)txpointer = check;
+					txpointer+=2;
+					
+					*(unaligned_ushort *)txpointer = 0;  //SystemError;
+					txpointer+=2;					
+				
+					txpointer+=sprintf(txpointer,"%s;%s;%s;",(char *)&MyApplication.Name,(char *)&MyApplication.VerInfo,(char *)&SystemID);				
+				break;
+				
+				case ICOM_COMMAND_CLEAR_MESSAGES:
+					for (i=0;i<MAX_MESSAGE_RECS;i++)
+					{
+						MessageList[i].status=0;
+						MessageList[i].id=ICOM_COMMAND_END;
+						MessageList[i].index=0;
+					}				
+					
+					MsgListBufIn		= 0;
+					MsgListBufOut		= 0;
+					MsgBufTimeout		= 0;
+					MsgBufRepeat		= 0;					
+				break;
+				
+				case ICOM_COMMAND_ENABLE_COINS:
+					EnableCoins(*(unaligned_ushort *)rxpointer);
+					*(unaligned_ushort *)txpointer = 0x0000;
+					txpointer+=2;
+				break;
+				
+				case ICOM_COMMAND_ENABLE_DISPENSE:
+					EnableManualDispense(*(unaligned_ushort *)rxpointer);
+					*(unaligned_ushort *)txpointer = 0x0000;
+					txpointer+=2;
+					
+					//Sound=0x01;
+				break;
+				
+				case ICOM_COMMAND_ENABLE_BILLS:
+					EnableBills(*(unaligned_ushort *)rxpointer);
+					*(unaligned_ushort *)txpointer = 0x0000;
+					txpointer+=2;					
+				break;
+				
+				case ICOM_COMMAND_MDB_COIN_CONFIG:
+					
+					#if (WH_EMP==1)
+					*txpointer++ = 'E';	// EMP
+					
+			  		*txpointer++ = MDB_Emp.Manufacturer[0];
+					*txpointer++ = MDB_Emp.Manufacturer[1];
+					*txpointer++ = MDB_Emp.Manufacturer[2];	  
+					for (s=0;s<=11;s++) *txpointer++ = MDB_Emp.Serial[s];
+					for (s=0;s<=11;s++) *txpointer++ = MDB_Emp.Model[s];	  
+					*(unaligned_ushort *)txpointer = MDB_Emp.Version;						  
+					txpointer+=2;
+	  				*(unaligned_ulong *)txpointer = MDB_Emp.OptionBits;					
+					txpointer+=4;
+					
+					*txpointer++ = MDB_Emp.Level;
+					*(unaligned_ushort *)txpointer = MDB_Emp.Currency;
+					txpointer+=2;
+					*txpointer++ = MDB_Emp.CoinScaling;
+					*txpointer++ = MDB_Emp.Decimals;					
+									
+	  				for (s=0;s<MDB_MAXCOINS;s++) *txpointer++ =MDB_Emp.CoinCredit[s];
+					
+					for (s=0;s<8;s++) *txpointer++ =MDB_Emp.CoinRouting[s]
+					#endif
+					
+					#if (TUBE_CHANGER==1)
+					*txpointer++ = 'T';	// TUBECHANGER
+					
+			  		*txpointer++ = MDB_Changer1.Manufacturer[0];
+					*txpointer++ = MDB_Changer1.Manufacturer[1];
+					*txpointer++ = MDB_Changer1.Manufacturer[2];	  
+					for (s=0;s<=11;s++) *txpointer++ = MDB_Changer1.Serial[s];
+					for (s=0;s<=11;s++) *txpointer++ = MDB_Changer1.Model[s];	  
+					*(unaligned_ushort *)txpointer = MDB_Changer1.Version;						  
+					txpointer+=2;
+	  				*(unaligned_ulong *)txpointer = MDB_Changer1.OptionalFeatures;					
+					txpointer+=4;
+					
+					*txpointer++ = MDB_Changer1.Level;
+					*(unaligned_ushort *)txpointer = MDB_Changer1.Currency;
+					txpointer+=2;
+					*txpointer++ = MDB_Changer1.CoinScaling;
+					*txpointer++ = MDB_Changer1.Decimals;					
+									
+	  				for (s=0;s<MDB_MAXCOINS;s++) *txpointer++ = MDB_Changer1.CoinCredit[s];
+					
+					*(unaligned_ushort *)txpointer = MDB_Changer1.CoinRouting;
+					txpointer+=2;
+					
+					#endif
+					
+				break;
+
+				case ICOM_COMMAND_MDB_BILL_CONFIG:
+					
+					*txpointer++ = 'B';	// BILL
+					
+			  		*txpointer++ = MDB_Validator.Manufacturer[0];
+					*txpointer++ = MDB_Validator.Manufacturer[1];
+					*txpointer++ = MDB_Validator.Manufacturer[2];	  
+					for (s=0;s<=11;s++) *txpointer++ = MDB_Validator.Serial[s];
+					for (s=0;s<=11;s++) *txpointer++ = MDB_Validator.Model[s];	  
+					*(unaligned_ushort *)txpointer = MDB_Validator.Version;						  
+					txpointer+=2;
+	  				*(unaligned_ulong *)txpointer = MDB_Validator.OptionalFeatures;					
+					txpointer+=4;
+					
+					*txpointer++ = MDB_Validator.Level;
+					*(unaligned_ushort *)txpointer = MDB_Validator.Currency;
+					txpointer+=2;
+					*txpointer++ = MDB_Validator.BillScaling;
+					*txpointer++ = MDB_Validator.Decimals;					
+									
+	  				for (s=0;s<MDB_MAXCOINS;s++) *txpointer++ =MDB_Validator.BillTypeCredit[s];
+					
+				    *(unaligned_ushort *)txpointer = MDB_Validator.StackerCapacity;
+					txpointer+=2;
+					*(unaligned_ushort *)txpointer = MDB_Validator.BillSecurityLevels;
+					txpointer+=2;										
+				break;
+
+				case ICOM_COMMAND_MDB_HOPPER_CONFIG:
+					
+					*txpointer++ = 'H';	// HOPPER
+					
+			  		*txpointer++ = MDB_Changer2.Manufacturer[0];
+					*txpointer++ = MDB_Changer2.Manufacturer[1];
+					*txpointer++ = MDB_Changer2.Manufacturer[2];	  
+					for (s=0;s<=11;s++) *txpointer++ = MDB_Changer2.Serial[s];
+					for (s=0;s<=11;s++) *txpointer++ = MDB_Changer2.Model[s];	  
+					*(unaligned_ushort *)txpointer = MDB_Changer2.Version;						  
+					txpointer+=2;
+	  				*(unaligned_ulong *)txpointer = MDB_Changer2.OptionalFeatures;					
+					txpointer+=4;
+					
+					*txpointer++ = MDB_Changer2.Level;
+					*(unaligned_ushort *)txpointer = MDB_Changer2.Currency;
+					txpointer+=2;
+					*txpointer++ = MDB_Changer2.CoinScaling;
+					*txpointer++ = MDB_Changer2.Decimals;					
+																		
+					for (s=MAX_HOPPER;s<MDB_MAXCOINS;s++) MDB_Changer2.CoinCredit[s]=0;
+					for (s=0;s<MAX_HOPPER;s++) 
+					{						
+						MDB_Changer2.CoinCredit[s]=SysVar.Hopper[s].Val / MDB_Changer2.CoinScaling;
+					}
+														
+	  				for (s=0;s<MDB_MAXCOINS;s++) *txpointer++ =MDB_Changer2.CoinCredit[s];					
+
+					*(unaligned_ushort *)txpointer = MDB_Changer2.CoinRouting;
+					txpointer+=2;
+										
+				break;
+
+				case ICOM_COMMAND_MDB_READER_CONFIG:
+					
+					*txpointer++ = 'R';	// Reader
+					
+			  		*txpointer++ = MDB_Cardreader.Manufacturer[0];
+					*txpointer++ = MDB_Cardreader.Manufacturer[1];
+					*txpointer++ = MDB_Cardreader.Manufacturer[2];	  
+					for (s=0;s<=11;s++) *txpointer++ = MDB_Cardreader.Serial[s];
+					for (s=0;s<=11;s++) *txpointer++ = MDB_Cardreader.Model[s];	  
+					*(unaligned_ushort *)txpointer = MDB_Cardreader.Version;						  
+					txpointer+=2;
+	  				*(unaligned_ulong *)txpointer = MDB_Cardreader.OptionalFeatures;					
+					txpointer+=4;
+					
+					*txpointer++ = MDB_Cardreader.Level;
+					*(unaligned_ushort *)txpointer = MDB_Cardreader.AVSFeature1;
+					txpointer+=2;
+					*txpointer++ = MDB_Cardreader.Scaling;
+					*txpointer++ = MDB_Cardreader.Decimals;					
+																																
+				break;
+
+				case ICOM_COMMAND_DISPENSE_AMOUNT:		// funktioniert nur durch Bestandsführung 		
+					*(unaligned_ushort *)txpointer = 0x0000;
+					
+					amount=*(unaligned_ulong *)rxpointer;
+					testmode=*(char *)(rxpointer+4);
+										
+					//varMoney(str, (long far*)&amount, MainCurrency,1);
+					//printf("DISPENSE Amount= %s %s",str,testmode ? "test":"   ");
+					
+					if (!DispenseAmount(amount,testmode)) *(unaligned_ushort *)txpointer = 0xFFFF;
+					
+					txpointer+=2;								
+				break;
+
+				case ICOM_COMMAND_DISPENSE_COIN:
+					*(unaligned_ushort *)txpointer = 0x0000;
+					
+					chn=*(unaligned_ushort *)rxpointer;
+					count=*(unaligned_ushort *)(rxpointer+1);
+					
+					if ((chn<21) && (count<1000))
+					{						
+ 					 	PayOutTubes[chn].TubeOut +=count;			// tatsächlich ausgeben, ohne Rückmeldung
+						printf("DISPENSE chn = %02u count=%02u",chn,count);						
+						
+						#if (TUBE_CHANGER==1)			
+			 			if (chn<MDB_MAXCOINS) 			
+						{
+							MDB_Changer1.TubeStatus[chn]-=count;	//bis zur Auffrischung
+							
+							for (h=0;h<MDB_MAXCOINS;h++) if (MDB_Changer1.PhysTubes[h]==chn) break;				
+							if (h<MDB_MAXCOINS) 
+							{
+								SysVar.Tube[h].Fill -=count;	// Fuellstande verringern
+							}
+						}
+						#endif
+						
+			 			if ((chn>15) && (chn<21)) 		
+						{	
+							if (!SysVar.Hopper[(chn & 0x0F)].Blocked)
+							{
+						 		SysVar.Hopper[(chn & 0x0F)].Fill -=count;	// Fuellstande verringern
+							}
+							else 
+							{
+								printf("HOPPER chn = %02u BLOCKED!",(chn & 0x0F));
+								
+								str[0]=count;
+								str[1]=chn & 0x07;
+								
+								addMessage(ICOM_MESSAGE_PAYOUT_ERROR, 2, &str[0]);
+								
+								*(unaligned_ushort *)txpointer = 0xFFFF;																
+							}
+						}
+					}
+					else *(unaligned_ushort *)txpointer = 0xFFFF;
+															
+					txpointer+=2;	
+					
+					//CalcCoinCRC(); //V1.29
+															
+				break;
+				
+				case ICOM_COMMAND_RGBANI:
+					*(unaligned_ushort *)txpointer = 0x0000;
+					
+					aniadr=*(char *)rxpointer;
+					ani=*(char *)(rxpointer+1);
+					if ((aniadr<3) && (ani<RGBANI_MAX_ANI)) 
+					{						
+						FRONTRGB_Ani[aniadr]=ani;
+						
+						switch(aniadr) 
+						{
+						case 0:
+							//CoinIllumAni=ani;
+						break;
+						case 1:
+							//CardIllumAni=ani;
+						break;
+						case 2:
+							//BillIllumAni=ani;
+						break;
+						}
+					}
+					
+					txpointer+=2;												
+				break;
+								
+				case ICOM_COMMAND_CARDREADER_DENY:
+					*(unaligned_ushort *)txpointer = 0x0000;
+					if (MDB_Cardreader.Sequence==Cardreader_Sequence_SESSION)
+					{
+						MDB_Cardreader.Sequence=Cardreader_Sequence_CANCELSESSION;
+						MDB_Cardreader.NextRequest=CmdCardreader_VendSessionComplete;
+					}
+					txpointer+=2;				
+				break;
+
+				case ICOM_COMMAND_CARDREADER_ENABLE:
+					*(unaligned_ushort *)txpointer = 0x0000;
+					chn=*(unsigned char *)rxpointer;
+					
+					if (chn)					
+						 MDB_Cardreader.Inhibit=0;
+					else 
+					{
+						MDB_Cardreader.Inhibit=1;
+						
+						if (MDB_Cardreader.Sequence==Cardreader_Sequence_SESSION)
+						{
+							MDB_Cardreader.Sequence=Cardreader_Sequence_CANCELSESSION;
+							MDB_Cardreader.NextRequest=CmdCardreader_ReaderCancel;
+						}
+					}
+					
+					txpointer+=2;
+				break;
+				
+				case ICOM_COMMAND_CARDREADER_PAYMENT:
+					*(unaligned_ushort *)txpointer = 0x0000;
+					amount=*(unaligned_ulong *)rxpointer;
+										
+					//varMoney(str, (long far*)&amount, MainCurrency,1);
+					//printf("CARDREADER Amount= %s",str);
+					
+					if (amount<=MDB_Cardreader.DispFundsAvailable)
+					{						
+						MDB_Cardreader.ItemPrice=amount;	
+						MDB_Cardreader.ItemNumber=0xFFFF;
+						//VEND_REQUEST
+						MDB_Cardreader.NextRequest=CmdCardreader_VendRequest;
+					}
+					else *(unaligned_ushort *)txpointer = 0xFFFF;				
+
+					txpointer+=2;	
+				break;
+
+				case ICOM_COMMAND_CMD_ADD_QUEUE:
+					UUID0=*(unaligned_ulong *)datapointer;
+					datapointer+=4;					
+					UUID1=*(unaligned_ulong *)datapointer;
+					datapointer+=4;					
+					UUID2=*(unaligned_ulong *)datapointer;
+					datapointer+=4;					
+					UUID3=*(unaligned_ulong *)datapointer;
+					datapointer+=4;					
+					OpenOptions=*(unaligned_ulong *)datapointer;
+					datapointer+=2;
+					SysVar.DirEntryTimeout=*(unsigned char *)datapointer++;
+					SysVar.DirEntryPause=*(unsigned char *)datapointer++;
+					SysVar.DirEntryRepeat=*(unsigned char *)datapointer++;
+					// PutOpenQueue(UUID0,UUID1,UUID2,UUID3,OpenOptions);										
+				break;
+
+								
+				default:
+					*(unaligned_ushort*)txpointer = 0xFFFF;
+					txpointer+=2;				
+				break;	
+				}	
+				
+				txlen = txpointer-crcpointer;
+				*(unaligned_ushort *)(crcpointer+2) = txlen-4;																	
+				*(unaligned_ushort *)txpointer = CalcCRC2(crcpointer,txlen);
+				txpointer+=2;				
+				
 			} //CRC
 			
 			rxpointer+=rxlen+2;
@@ -184,8 +892,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 			*(unaligned_ushort *)txpointer = ICOM_COMMAND_END;
 			txpointer+=2;
 			
-			//Rücksenden an Anfragenden			
-			//uip_send(uip_appdata,(txpointer-uip_appdata));
+			//Rücksenden an Anfragenden						
             //udp_sendto(upcb, p, addr, port);
 		}
 	}	
@@ -203,16 +910,10 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 
 }
 
-static void udp_intercom_send(struct udp_pcb *upcb) 
-{
-
-}
-
 /* MESSAGE INTERCOM SYSTEM PORT 1010*/
 
 void intercomMessage_poll(void) {
 
-uint32_t handle;
 unsigned char *rxpointer,*txpointer,*crcpointer;
 unsigned int cmd, check, rxlen, txlen, s;
 unsigned long index;
@@ -220,13 +921,14 @@ unsigned long index;
 uint8_t buf[256];
 
 	/* Check Timeouts for Offers */
-	if (++IntercomPollCount==10) {		
-		IntercomConnected = false;		
-		printf("InterCom Connection timed out!\r\n");
-	}		
-
 	if (IntercomConnected) 
 	{
+		if (++IntercomPollCount >= 10) {		
+			IntercomConnected = false;		
+			printf("InterCom Connection timed out!\r\n");
+			return;
+		}		
+
 		// check for message in FIFO
 		printf("InterCom Connection check for message...\r\n");
 
@@ -254,7 +956,7 @@ uint8_t buf[256];
 					txpointer+=2;					
 					*(unaligned_ushort *)txpointer = MessageList[MsgListBufOut].len + 4;
 					txpointer+=2;		
-					*(unsigned long *)txpointer = MessageList[MsgListBufOut].index;
+					*(unaligned_ulong *)txpointer = MessageList[MsgListBufOut].index;
 					txpointer+=4;
 
 					for (s=0;s<MessageList[MsgListBufOut].len;s++) *txpointer++= MessageList[MsgListBufOut].Data[s];
@@ -264,11 +966,11 @@ uint8_t buf[256];
 					*(unaligned_ushort *)txpointer = CalcCRC2(crcpointer,txlen);
 					txpointer+=2;										
 
-					printf("SENDING MESSAGE %04X Index=%08lX repeat=%u",MessageList[MsgListBufOut].id, MessageList[MsgListBufOut].index, MsgBufRepeat);
+					printf("SENDING MESSAGE %04X Index=%08lX repeat=%u\r\n",MessageList[MsgListBufOut].id, MessageList[MsgListBufOut].index, MsgBufRepeat);
 				}
 				else 
 				{
-					printf("INVALID MESSAGE %04X",MessageList[MsgListBufOut].id);
+					printf("INVALID MESSAGE %04X\r\n",MessageList[MsgListBufOut].id);
 					if (++MsgListBufOut>=MAX_MESSAGE_RECS) MsgListBufOut=0;	//discard !!!	
 					MsgBufTimeout=0;
 					return;
@@ -282,7 +984,7 @@ uint8_t buf[256];
 					{
 						if (--MsgBufRepeat==0)
 						{
-							printf("DISCARDING MESSAGE %04X",MessageList[MsgListBufOut].id);
+							printf("DISCARDING MESSAGE %04X\r\n",MessageList[MsgListBufOut].id);
 							if (++MsgListBufOut>=MAX_MESSAGE_RECS) MsgListBufOut=0;	//discard !!!	
 							MsgBufTimeout=0;
 						}
@@ -300,8 +1002,8 @@ uint8_t buf[256];
         	p = pbuf_alloc(PBUF_RAW,txlen,PBUF_RAM);
 
         	if (p != NULL) {
-            	pbuf_take(p,buf,txlen);
-				struct udp_pcb *mpcb = udp_new();
+            	pbuf_take(p,buf,txlen);				
+				printf("Sending message len=%d ip=%s \r\n", p->len, ip4addr_ntoa(&callerIP));    
 				udp_sendto(mpcb, p, &callerIP, INTERCOM_MESSAGE_PORT);
 				pbuf_free(p);
 			}
@@ -310,7 +1012,97 @@ uint8_t buf[256];
 	} // not connected !
 }
 
+static void udp_message_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port) 
+{    
+ unsigned char *rxpointer,*txpointer,*crcpointer,*datapointer;
+ uint16_t cmd, check, rxlen, txlen; 
+ unsigned long index;
+
+    // Do something with the packet that was just received        
+
+    if(p == NULL) return;
+
+    printf("MESSAGE_PORT Received data ! len=%d ip=%s port=%u\r\n", p->len, ip4addr_ntoa(addr), port );    
+
+    hexdump(p->payload, p->len, 16, 8);
+
+	rxpointer = p->payload;
+	txpointer = p->payload + sizeof(Intercom_Header);
+		
+	if (strncmp(rxpointer, &Intercom_Header[0], sizeof(Intercom_Header))==0)
+	{								
+		memcpy(&callerIP, addr, sizeof(struct ip4_addr)); // for Messsages
+				
+		rxpointer += sizeof(Intercom_Header);
+				
+		cmd = *(unaligned_ushort *)rxpointer;
+		crcpointer=rxpointer;
+		rxpointer+=2;
+		
+		while ((cmd != ICOM_COMMAND_END) && ((rxpointer - (unsigned char*)p->payload) < p->len))
+		{
+			rxlen = *(unaligned_ushort *)rxpointer;
+			check = *(unaligned_ushort *)(rxpointer + rxlen + 2);			
+			rxpointer+=2;  // Pointer auf Datenbeginn
+			datapointer=rxpointer;
+			
+			if (check==CalcCRC2(crcpointer,rxlen+4))
+			{			
+				index=*(unaligned_ulong *)rxpointer;
+				
+				printf("ICOM_MESSAGE_RESPONSE = %04X LENGTH=%04X TIMEOUT=%u IDX=%08lX",cmd,rxlen,MsgBufTimeout,index);
+				
+				if (index==MessageList[MsgListBufOut].index)
+				{
+					printf("ICOM_MESSAGE_INDEX = %08lX ACK", MessageList[MsgListBufOut].index);
+					
+					if (++MsgListBufOut>=MAX_MESSAGE_RECS) MsgListBufOut=0;	//erledigt !
+					MsgBufTimeout=0;								
+				}
+
+			} //CRC
+			
+			rxpointer+=rxlen+2;
+			cmd = *(unaligned_ushort *)rxpointer;
+			crcpointer=rxpointer;
+			rxpointer+=2;				
+		}								
+	}	
+			
+    pbuf_free(p);
+
+}
+
+
 
 void addMessage(uint16_t id, uint16_t len, uint8_t* data){
+
+uint32_t handle;
+
+	printf("ADD MESSAGE ID %02X BufIn=%u BufOut=%u\r\n",id,MsgListBufIn,MsgListBufOut);
+
+    if ((MsgListBufIn+1) != MsgListBufOut)
+	{
+		if (len<=MAX_MESSAGE_LEN)				
+		{			
+			MessageList[MsgListBufIn].status=1;
+		
+			MessageList[MsgListBufIn].id=id;
+		
+			MessageList[MsgListBufIn].len=len;
+		
+			memcpy(&MessageList[MsgListBufIn].Data[0],data,len);			
+					
+		   	handle = random();
+		   	//handle =(handle<<8)+ Time.S;
+		   	//handle =(handle<<16)+ indexCounter++;
+		
+			MessageList[MsgListBufIn].index=handle;
+		
+			if (++MsgListBufIn>=MAX_MESSAGE_RECS) MsgListBufIn=0;
+		}
+		else printf("MESSAGE SEND LENGTH ERROR\r\n");
+	}
+	else printf("MESSAGE SEND BUFFER FULL\r\n");		
 
 }

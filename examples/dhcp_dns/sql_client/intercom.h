@@ -148,7 +148,7 @@ typedef struct __attribute__((packed)) APPtag{
  * Variables
  * ----------------------------------------------------------------------------------------------------
  */
-extern SAVEVARS	SysVar;
+extern struct SAVEVARtag SysVar;
 
 extern struct COIN_OVERRIDEtag	CoinOver[16];
 extern struct BILL_OVERRIDEtag BillOver[16];

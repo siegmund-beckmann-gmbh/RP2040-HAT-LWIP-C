@@ -73,6 +73,8 @@ bool EintrittSignal = false;
 
 pico_unique_board_id_t SystemID;
 
+unsigned char IntercomBuf[TCP_MSS];
+
 /* Functions */
 
 unsigned int CalcCRC(unsigned int StartVal, unsigned char *Buf, unsigned int len)
@@ -139,7 +141,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 {    
  unsigned char *rxpointer,*txpointer,*crcpointer,*datapointer;
 
- uint16_t cmd, ccmd, check, rxlen, txlen, s,taglen,count,k, OpenOptions;
+ uint16_t cmd, ccmd, check, expCRC, rxlen, txlen, s,taglen,count,k, OpenOptions;
  uint8_t cf_byte,tag,testmode,ani,aniadr,chn,ectype,Derr;
  uint32_t amount, UUID0,UUID1,UUID2,UUID3;
  char str[64];
@@ -164,7 +166,8 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 	{								
 		memcpy(&callerIP, addr, sizeof(struct ip4_addr)); // for Messsages
 				
-		rxpointer += sizeof(Intercom_Header);
+		memcpy(&IntercomBuf[0],p->payload, p->len);
+		rxpointer = (unsigned char *)&IntercomBuf[0] + sizeof(Intercom_Header);
 				
 		cmd = *(unaligned_ushort *)rxpointer;
 		crcpointer=rxpointer;
@@ -176,8 +179,10 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 			check = *(unaligned_ushort *)(rxpointer + rxlen + 2);			
 			rxpointer+=2;  // Pointer auf Datenbeginn
 			datapointer=rxpointer;
+
+			expCRC = CalcCRC2(crcpointer,rxlen+4);
 			
-			if (check==CalcCRC2(crcpointer,rxlen+4))
+			if (check==expCRC)
 			{			
                 printf("ICOM_COMMAND = %04X LENGTH=%04X CRC=%04X\r\n", cmd, rxlen, check );    
 
@@ -188,6 +193,9 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 				
 				switch(cmd)
 				{
+				case 0: // do nothing
+				break;
+
 				case ICOM_COMMAND_SYSTEM_CONFIG:
 					*(unaligned_ushort *)txpointer = 0x0000;				
 					txpointer+=2;									
@@ -879,6 +887,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 				txpointer+=2;				
 				
 			} //CRC
+			else printf("CRC_ERR: ICOM_COMMAND = %04X LENGTH=%04X excepctedCRC=%04X\r\n", cmd, rxlen, expCRC );    
 			
 			rxpointer+=rxlen+2;
 			cmd = *(unaligned_ushort *)rxpointer;
@@ -886,14 +895,17 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 			rxpointer+=2;				
 		}
 				
+		txlen = (txpointer - (unsigned char*)p->payload);
 				
-		if ((txpointer - (unsigned char*)p->payload - sizeof(Intercom_Header)) > 0)
+		if ((txlen - sizeof(Intercom_Header)) > 0)
 		{
 			*(unaligned_ushort *)txpointer = ICOM_COMMAND_END;
 			txpointer+=2;
+			p->len = txlen;
+			p->tot_len = txlen;
 			
 			//Rücksenden an Anfragenden						
-            //udp_sendto(upcb, p, addr, port);
+            udp_sendto(upcb, p, addr, port);
 		}
 	}	
 

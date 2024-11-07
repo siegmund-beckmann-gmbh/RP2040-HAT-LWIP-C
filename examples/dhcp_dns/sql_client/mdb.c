@@ -57,10 +57,10 @@ const unsigned char ExpRequestID_Serial[13]="000000000001";
 const unsigned char ExpRequestID_Model[13] ="    BE_ZENT5";
 const unsigned char ExpRequestID_Version[2] = {0x10,0x10};
 
-static SAVEVARS	SysVar;
+SAVEVARS SysVar;
 
-static struct COIN_OVERRIDEtag	CoinOver[16];
-static struct BILL_OVERRIDEtag BillOver[16];
+struct COIN_OVERRIDEtag	CoinOver[16];
+struct BILL_OVERRIDEtag BillOver[16];
 
 EmpTag MDB_Emp;
 

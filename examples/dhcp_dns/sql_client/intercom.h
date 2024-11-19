@@ -33,6 +33,8 @@
 #define INTERCOM_INFO_PORT			1004
 #define	OFFLINE_CLIENT_PORT			11111
 
+#define MAX_RELAIS                  4
+
 #define ICOM_TIMEOUT				4
 #define ICOM_SEND_REPEAT			3
 
@@ -152,6 +154,10 @@ extern struct SAVEVARtag SysVar;
 
 extern struct COIN_OVERRIDEtag	CoinOver[16];
 extern struct BILL_OVERRIDEtag BillOver[16];
+
+extern unsigned char CoinIllumAni;
+extern unsigned char BillIllumAni;
+extern unsigned char CardIllumAni;
 
 extern EmpTag MDB_Emp;
 

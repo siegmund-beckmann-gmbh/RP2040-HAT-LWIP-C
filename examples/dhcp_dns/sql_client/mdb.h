@@ -626,7 +626,7 @@ void CheckCoinToMain();
 
 void putMDBevent(MDB_EVENT *event);
 
-extern bool AusgabeLeuchte;
+extern bool trayLight;
 
 #endif /* MDB_H */
 // -----------------------------------------------------------------------------------

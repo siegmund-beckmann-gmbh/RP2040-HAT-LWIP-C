@@ -150,7 +150,7 @@ void EnableManualDispense(unsigned int enable)
 
 void EnableIllumination()
 {
-	AusgabeLeuchte = true;
+	trayLight = true;
 }
 
 

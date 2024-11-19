@@ -67,13 +67,14 @@ bool IntercomConnected = false;
 
 bool crc_error = false;
 
-bool AusgabeLeuchte = false;
+extern bool trayLight;
 bool DirektEintritt = false;
 bool EintrittSignal = false;
 
 pico_unique_board_id_t SystemID;
 
 unsigned char IntercomBuf[TCP_MSS];
+unsigned char RelaisStat[MAX_RELAIS];
 
 /* Functions */
 
@@ -123,6 +124,8 @@ void udp_intercom_init()
 	udp_recv(mpcb, udp_message_received, passed_data);
 	udp_bind(mpcb, IP4_ADDR_ANY, INTERCOM_MESSAGE_PORT);    
 
+	for (int r=0;r<MAX_RELAIS;r++) RelaisStat[r]=0;
+
 	for (int cl=0;cl<MAX_MESSAGE_RECS;cl++)
 	{
 		MessageList[cl].status=0;
@@ -159,16 +162,16 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 	IntercomPollCount = 0;
 	IntercomConnected = true;
 
-	rxpointer = p->payload;
-	txpointer = p->payload + sizeof(Intercom_Header);
+	rxpointer = p->payload;	
+
+	memcpy(&IntercomBuf[0], &Intercom_Header[0], sizeof(Intercom_Header));	
+	txpointer = &IntercomBuf[0] + sizeof(Intercom_Header);  // prepare send buffer
 		
 	if (strncmp(rxpointer, &Intercom_Header[0], sizeof(Intercom_Header))==0)
 	{								
-		memcpy(&callerIP, addr, sizeof(struct ip4_addr)); // for Messsages
-				
-		memcpy(&IntercomBuf[0],p->payload, p->len);
-		rxpointer = (unsigned char *)&IntercomBuf[0] + sizeof(Intercom_Header);
-				
+		memcpy(&callerIP, addr, sizeof(struct ip4_addr)); // for Messsages								
+		rxpointer += sizeof(Intercom_Header);
+		
 		cmd = *(unaligned_ushort *)rxpointer;
 		crcpointer=rxpointer;
 		rxpointer+=2;
@@ -374,13 +377,13 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 					{
 						// set Relais
 						MDB_Changer2.ManualDispenseEnable = (MDB_Changer2.ManualDispenseEnable | h); 
-						//RelaisStat[chn]=1;
+						RelaisStat[chn]=1;
 					}
 					else
 					{
 						// clr Relais
 						MDB_Changer2.ManualDispenseEnable = (MDB_Changer2.ManualDispenseEnable & ~h);
-						//RelaisStat[chn]=0;				
+						RelaisStat[chn]=0;				
 					}		
 					
 				     MDB_Changer2.NewSequence=Changer_Sequence_COINTYPE;	//002
@@ -388,20 +391,21 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 							
 				break;
 				
-				case ICOM_COMMAND_CMD_SET_LIGHT:
-					chn=*(unsigned char *)rxpointer;
+				case ICOM_COMMAND_CMD_SET_LIGHT:				
+					chn=*rxpointer;
 					if (chn!=0) 
-						 AusgabeLeuchte = true;
-					else AusgabeLeuchte = false;					
+						 trayLight = true;
+					else trayLight = false;		
+					//printf("SET LIGHT = %04X Value=%02X\r\n", cmd, chn );    			
 				break;
 				case ICOM_COMMAND_CMD_SET_DIRECT:
-					chn=*(unsigned char *)rxpointer;
+					chn=*rxpointer;
 					if (chn!=0) 
 						 DirektEintritt = true;
 					else DirektEintritt = false;					
 				break;
 				case ICOM_COMMAND_CMD_SET_EXTRA:
-					chn=*(unsigned char *)rxpointer;
+					chn=*rxpointer;
 					if (chn!=0) 
 						 EintrittSignal = true;
 					else EintrittSignal = false;									
@@ -534,9 +538,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 				break;
 				case ICOM_COMMAND_GENERAL_STATUS:
 					check=SystemConfig & 0x0F;
-					
-					//if (CRTSCD_ready)  check |=0x10;
-																				
+																									
 					*(unaligned_ushort *)txpointer = check;
 					txpointer+=2;
 					
@@ -569,9 +571,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 				case ICOM_COMMAND_ENABLE_DISPENSE:
 					EnableManualDispense(*(unaligned_ushort *)rxpointer);
 					*(unaligned_ushort *)txpointer = 0x0000;
-					txpointer+=2;
-					
-					//Sound=0x01;
+					txpointer+=2;					
 				break;
 				
 				case ICOM_COMMAND_ENABLE_BILLS:
@@ -740,7 +740,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 					if ((chn<21) && (count<1000))
 					{						
  					 	PayOutTubes[chn].TubeOut +=count;			// tatsächlich ausgeben, ohne Rückmeldung
-						printf("DISPENSE chn = %02u count=%02u",chn,count);						
+						printf("DISPENSE chn = %02u count=%02u\n",chn,count);						
 						
 						#if (TUBE_CHANGER==1)			
 			 			if (chn<MDB_MAXCOINS) 			
@@ -794,13 +794,13 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 						switch(aniadr) 
 						{
 						case 0:
-							//CoinIllumAni=ani;
+							CoinIllumAni=ani;
 						break;
 						case 1:
-							//CardIllumAni=ani;
+							CardIllumAni=ani;
 						break;
 						case 2:
-							//BillIllumAni=ani;
+							BillIllumAni=ani;
 						break;
 						}
 					}
@@ -894,18 +894,23 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 			crcpointer=rxpointer;
 			rxpointer+=2;				
 		}
-				
-		txlen = (txpointer - (unsigned char*)p->payload);
-				
-		if ((txlen - sizeof(Intercom_Header)) > 0)
+										
+		if ((txpointer - &IntercomBuf[0]) > sizeof(Intercom_Header))
 		{
 			*(unaligned_ushort *)txpointer = ICOM_COMMAND_END;
 			txpointer+=2;
-			p->len = txlen;
-			p->tot_len = txlen;
-			
-			//Rücksenden an Anfragenden						
-            udp_sendto(upcb, p, addr, port);
+			txlen = (txpointer - &IntercomBuf[0]);
+
+			struct pbuf *sendBuf;    		
+        	sendBuf = pbuf_alloc(PBUF_RAW,txlen,PBUF_RAM);
+
+        	if (sendBuf != NULL) {
+            	pbuf_take(sendBuf,&IntercomBuf[0],txlen);				
+				printf("Sending answer len=%d ip=%s \r\n", txlen, ip4addr_ntoa(&callerIP));  
+				hexdump(sendBuf->payload, txlen, 16, 8);  
+				udp_sendto(upcb, sendBuf, addr, port);
+				pbuf_free(sendBuf);
+			}
 		}
 	}	
 
@@ -942,7 +947,7 @@ uint8_t buf[256];
 		}		
 
 		// check for message in FIFO
-		printf("InterCom Connection check for message...\r\n");
+		// printf("InterCom Connection check for message...\r\n");
 
 		if (MsgListBufIn != MsgListBufOut)
 		{	

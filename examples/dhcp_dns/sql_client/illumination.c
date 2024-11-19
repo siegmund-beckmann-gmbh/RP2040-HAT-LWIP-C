@@ -293,7 +293,7 @@ void writeIllum()
  	unsigned char *Led_Animation;
  	unsigned char sendData[8];
 
-    Led_Animation = (char *)animation[CoinIllumAni];
+    Led_Animation = (char *)animation[CoinIllumAni & 0x07];
 
 	if(++CoinIllum >= Led_Animation[0]) CoinIllum = 0;
 
@@ -306,7 +306,7 @@ void writeIllum()
 	
 	i2c_write_timeout_per_char_us(I2C_HW,SAA1064_0,&sendData[0],6,false, 1000);
 
-    Led_Animation = (char *)animation[BillIllumAni];
+    Led_Animation = (char *)animation[BillIllumAni & 0x07];
 
 	if(++BillIllum >= Led_Animation[0]) BillIllum = 0;
 
@@ -319,7 +319,7 @@ void writeIllum()
 	
 	i2c_write_timeout_per_char_us(I2C_HW,SAA1064_1,&sendData[0],6,false, 1000);
 		
-    Led_Animation = (char *)animation[CardIllumAni];
+    Led_Animation = (char *)animation[CardIllumAni & 0x07];
 
 	if(++CardIllum >= Led_Animation[0]) CardIllum = 0;
 

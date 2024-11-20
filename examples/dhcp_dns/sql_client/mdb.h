@@ -616,15 +616,17 @@ void EnableManualDispense(unsigned int enable);
 void EnableIllumination();
 
 void EnableBills(unsigned int enable);
-void DisableBills(void);
+//void DisableBills(void);
 
 unsigned char DispenseAmount(unsigned long amount, unsigned char testmode);
-void SetAKZmax(unsigned long pay, unsigned char changemode);
+//void SetAKZmax(unsigned long pay, unsigned char changemode);
 
-void CheckHopperFill();
+//void CheckHopperFill();
 void CheckCoinToMain();
 
 void putMDBevent(MDB_EVENT *event);
+
+extern void CalcCoinCRC();
 
 extern bool trayLight;
 

@@ -65,11 +65,12 @@ struct ip4_addr callerIP;
 
 bool IntercomConnected = false;
 
-bool crc_error = false;
+u8_t crc_error = 0;
+bool crc_error_sent = false;
 
 extern bool trayLight;
-bool DirektEintritt = false;
-bool EintrittSignal = false;
+extern bool directEntry;
+extern bool directSignal;
 
 pico_unique_board_id_t SystemID;
 
@@ -110,6 +111,15 @@ crc = 0;
 
   return crc;
 }
+
+void CalcCoinCRC(void){
+	if (crc_error != 2) {
+		SysVar.CRC = CalcCRC2((char*)&SysVar,356);
+		crc_error_sent = true;
+		crc_error = 0;
+	}
+}
+
 
 
 void udp_intercom_init() 
@@ -324,7 +334,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 															
 					txpointer+=2;
 					
-					//CalcCoinCRC();
+					CalcCoinCRC();
 				break;
 				
 				case ICOM_COMMAND_CHANGER_TOTAL:
@@ -366,7 +376,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 					}				
 										
 					//writeConfigFile(); // V1.38	
-					//CalcCoinCRC(); //V1.29
+					CalcCoinCRC();
 				break;
 				
 				case ICOM_COMMAND_CMD_SET_OUTPUTS:	// V1.24
@@ -401,14 +411,14 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 				case ICOM_COMMAND_CMD_SET_DIRECT:
 					chn=*rxpointer;
 					if (chn!=0) 
-						 DirektEintritt = true;
-					else DirektEintritt = false;					
+						 directEntry = true;
+					else directEntry = false;					
 				break;
 				case ICOM_COMMAND_CMD_SET_EXTRA:
 					chn=*rxpointer;
 					if (chn!=0) 
-						 EintrittSignal = true;
-					else EintrittSignal = false;									
+						 directSignal = true;
+					else directSignal = false;									
 				break;
 
 				case ICOM_COMMAND_GET_PRIORIETIES:	//Für DISPENSE_AMOUNT
@@ -447,7 +457,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 					}				
 					
 					//writeConfigFile(); // V1.38	
-					//CalcCoinCRC(); //V1.29
+					CalcCoinCRC();
 				break;				
 				
 				case ICOM_COMMAND_BILL_FILL:
@@ -460,7 +470,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 						txpointer+=2;									
 					}		
 					
-					//CalcCoinCRC(); //V1.25				
+					CalcCoinCRC();
 				break;
 				case ICOM_COMMAND_TUBE_FILL:
 					for (s=0;s<MDB_MAXCOINS;s++) 
@@ -502,7 +512,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 						else *txpointer++=SysVar.Hopper[s].Status;
 					}
 				
-					//CalcCoinCRC(); //V1.25					
+					CalcCoinCRC();
 				break;
 				case ICOM_COMMAND_HOPPER_VALUES:
 					for (s=0;s<MAX_HOPPER;s++) 
@@ -521,7 +531,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 						else *txpointer++=SysVar.Hopper[s].Status;
 					}
 					
-					//CalcCoinCRC(); //V1.25					
+					CalcCoinCRC(); 
 				break;				
 				case ICOM_COMMAND_CASHBOX_FILL:
 					for (s=0;s<MDB_MAXCOINS;s++) 
@@ -534,7 +544,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 					}								
 					
 					crc_error=0;
-					//CalcCoinCRC(); //V1.25					
+					CalcCoinCRC();
 				break;
 				case ICOM_COMMAND_GENERAL_STATUS:
 					check=SystemConfig & 0x0F;
@@ -778,7 +788,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 															
 					txpointer+=2;	
 					
-					//CalcCoinCRC(); //V1.29
+					CalcCoinCRC();
 															
 				break;
 				
@@ -942,6 +952,7 @@ uint8_t buf[256];
 	{
 		if (++IntercomPollCount >= 10) {		
 			IntercomConnected = false;		
+			crc_error_sent = false;
 			printf("InterCom Connection timed out!\r\n");
 			return;
 		}		

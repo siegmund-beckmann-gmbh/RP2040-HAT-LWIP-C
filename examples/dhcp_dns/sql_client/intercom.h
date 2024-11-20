@@ -189,11 +189,16 @@ struct udp_pcb *mpcb;
  * Functions
  * ----------------------------------------------------------------------------------------------------
  */
+unsigned int CalcCRC(unsigned int StartVal, unsigned char *Buf, unsigned int len);
+unsigned int CalcCRC2(unsigned char *Buf, unsigned long Buflen);
+
+void CalcCoinCRC(void);
 void udp_intercom_init(void);
 static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port);
 static void udp_message_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port);
 
 void intercomMessage_poll(void);
 void addMessage(uint16_t id, uint16_t len, uint8_t* data);
+
 
 #endif // _INTERCOM_H_

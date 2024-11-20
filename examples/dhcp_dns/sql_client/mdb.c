@@ -314,7 +314,7 @@ void InitChanger2()
 	
 	MDB_Changer1.DiagnosticCommand=0;		
 
-	//CalcCoinCRC(); //V1.26		
+	CalcCoinCRC();
 }
 
 void InitCardreader()
@@ -546,7 +546,7 @@ void InitMDB(void)
  		else	SysVar.Hopper[s].Hysteresis=0;
  	}
 	
-	// CalcCoinCRC(); //V1.25
+	CalcCoinCRC();
 }
 
 void MDBTimeout(void)
@@ -747,7 +747,7 @@ void RX_Handle_Emp(unsigned char buff_point)
 		 SysVar.Hopper[3].Val = (unsigned int)MDB_Emp.CoinCredit[2*s+1] * (unsigned int)MDB_Emp.CoinScaling;
 	  }
 	  
-	  //CalcCoinCRC(); //V1.25
+	  CalcCoinCRC();
 	  
 	  MDB_Emp.NextRequest=CmdEmp_Poll;	//	POLL
 	  break; 	    		
@@ -803,7 +803,7 @@ void RX_Handle_Emp(unsigned char buff_point)
 						SysVar.Coin[channel].Count++;
 	        		}
 					
-					//CalcCoinCRC(); //V1.25
+					CalcCoinCRC();
 					   
 		   			MDBEvent.Type    = EvTypeMDB_EmpCoinInserted;			// Coin inserted
    	   				MDBEvent.Length  = 3;
@@ -1017,7 +1017,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 			   SysVar.Tube[s].Ready=0;
 		   }	
 		   
-		   //CalcCoinCRC(); //V1.26
+		   CalcCoinCRC();
 		   	   
 	  }
 #endif	
@@ -1155,7 +1155,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 			// s=13 Muenzregister 5bit   s=14 Relaiszustand bit 0-2  s=15 Eingangszustand bit 0/1 Motor�ffner bit 2-4 Optos
 	  	 }	  	 	  	 
 		 
-		 //CalcCoinCRC(); //V1.25
+		 CalcCoinCRC();
 	  }
 	  
 	  if (hChanged)
@@ -1215,7 +1215,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 							if (hop<MAX_HOPPER)
 							{
 		          				SysVar.Hopper[MDB_Changer->Status[s+2] & 0x07].Blocked=1;
-								//CalcCoinCRC(); //V1.25
+								CalcCoinCRC();
 		          				// Timeout PayOut
 		          				// Z2= Rest
 		          				// Z3= Hopper 0x00 - 0x04
@@ -1323,7 +1323,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 	                  	MDB_Changer->LastValue=coinval;
 					  
 	  				 	SysVar.Coin[stat & 0x0F].Count++;
-						//CalcCoinCRC(); //V1.25
+						CalcCoinCRC();
 	                  					  	
 		   	  			MDBEvent.Type    = EvTypeMDB_CoinInCashbox;
    	   		  			MDBEvent.Length  = 3;
@@ -1344,7 +1344,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 							if (SysVar.Tube[k].Deroute) 
 							{
 								SysVar.Hopper[SysVar.Tube[k].Deroute-1].Fill++;
-								// CalcCoinCRC(); //V1.26
+								CalcCoinCRC(); 
 								sec=1;
 							}
 							else sec=mc-SysVar.Tube[k].Fill;
@@ -1770,7 +1770,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 							break;
 						 }																
 				
-						// CalcCoinCRC(); //V1.25
+						CalcCoinCRC();
 
 						
 		   	  			MDBEvent.Type    = EvTypeMDB_BillStackedManually;
@@ -2359,7 +2359,7 @@ void RX_Handle_Validator(unsigned char buff_point)
 		                    MDB_Validator.LastValue=MDB_Validator.NoteValue;
 				    		MDB_Validator.NextRequest=CmdValidator_Poll;
 							
-							//CalcCoinCRC(); //V1.25
+							CalcCoinCRC();
 		    				
 				    		MDBEvent.Type    = EvTypeMDB_BillStacked;			// Bill inserted
 	   	   		    		MDBEvent.Length  = 7;
@@ -3938,7 +3938,7 @@ unsigned char amt2[16];
 			}
         }  	        
    
-   		//CalcCoinCRC(); //V1.25			
+   		CalcCoinCRC();
 	
     }
   	return 1;	

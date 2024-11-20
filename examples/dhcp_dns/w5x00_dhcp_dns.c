@@ -107,6 +107,8 @@ extern bool directSignal;
 extern bool relais4;
 extern bool relais5;
 
+extern u8_t crc_error;
+extern bool crc_error_sent;
 
 /* MDB */
 extern queue_t MDBfifo;
@@ -165,6 +167,8 @@ enum KeyEvent_types{
 };
 
 static uint KeyboardDelay = 10;
+
+u8_t VarCheck = 1;
 
 void set_system_time(u32_t sec);
 
@@ -434,6 +438,24 @@ int main()
                 printf("KEY Event %d Length %d\n", evKey.Type, evKey.Length);
             break;
             }
+        }
+
+        if (VarCheck) {
+
+            printf("SysVar CRC-Check...\n");
+
+            if ((SysVar.CRC != CalcCRC2((char*)&SysVar, 356))  || crc_error)
+            {
+                crc_error = 1;
+                if (!crc_error_sent)
+                {
+                    addMessage(ICOM_MESSAGE_CRC_ERROR, 0, &VarCheck);
+                    printf("SysVar CRC-Error!\n");
+                    crc_error_sent = true;
+                }
+            }
+
+            VarCheck = 0;
         }
 
     }

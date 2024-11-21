@@ -5,7 +5,7 @@
 const APP MyApplication={
     "APF",
     "Phoenix-RemoteII",
-    "Ver 1.00 07.11.2024",
+    "Ver 1.00 21.11.2024",
     100    
 };
 

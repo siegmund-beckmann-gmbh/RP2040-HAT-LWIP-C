@@ -114,6 +114,9 @@ extern bool crc_error_sent;
 /* MDB */
 extern queue_t MDBfifo;
 
+
+extern const APP MyApplication;
+
 /* GPIO */
 
 queue_t KEYfifo;
@@ -212,9 +215,9 @@ int main()
     err_t old_status = ERR_OK;
 
     // Initialize network configuration
-    //IP4_ADDR(&default_ip, 192, 168, 0, 80);
+    //IP4_ADDR(&default_ip, 192, 168, 190, 99);
     //IP4_ADDR(&default_mask, 255, 255, 255, 0);
-    //IP4_ADDR(&default_gateway, 192, 168, 0, 1);
+    //IP4_ADDR(&default_gateway, 192, 168, 190, 1);
 
     set_clock_khz();
 
@@ -248,11 +251,30 @@ int main()
 
     pico_get_unique_board_id(&SystemID);    
 
-    printf("Persistent Memory address = %x", getAddressPersistent());
+    printf("starting up...\nSystemID = ");
+    hexdump(&SystemID,sizeof(SystemID),8,8);    
+
+    nvs_print_info();    
+
+    uint16_t chkCRC = CalcCRC2(nvs_get_pagePointer(0),254);
+    uint16_t nvsCRC = *(uint16_t*)(nvs_get_pagePointer(0)+254);
+
+    if (chkCRC != nvsCRC) {
+        printf("nvsCRC=%x\n",nvsCRC);
+        printf("calculated CRC=%x\n",chkCRC);
+
+        uint8_t buffer[256];
+        memset(&buffer[0],0xff,256);
+        memcpy(&buffer[0],(uint8_t*)&MyApplication,sizeof(MyApplication));
+        *(unaligned_uint*)&buffer[254] = CalcCRC2(&buffer[0],254);
+
+        nvs_write_page(0,&buffer[0]);
+        //hexdump((uint8_t*)&MyApplication,sizeof(MyApplication), 16, 8);
+    }
 
     unsigned char RTCavail = InitClock();
 
-    printf("rtc chip ds1307 available= %u \n",RTCavail);
+    printf("rtc chip ds1307 available= %u\n",RTCavail);
 
     IlluminationInit();
 
@@ -265,9 +287,6 @@ int main()
     
     InitMDB();
     
-    printf("starting up...\nSystemID = ");
-    hexdump(&SystemID,sizeof(SystemID),8,8);    
-
     sleep_ms(100); // wait a while
 
     wizchip_spi_initialize();
@@ -364,7 +383,7 @@ int main()
 
                 g_dns_get_ip_flag = 1;
 
-                tcp_postgresql_init(&g_resolved);                
+                // tcp_postgresql_init(&g_resolved);                
                 
             }
 

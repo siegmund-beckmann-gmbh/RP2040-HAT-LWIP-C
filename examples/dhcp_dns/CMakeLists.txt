@@ -1,6 +1,7 @@
 set(TARGET_NAME w5x00_dhcp_dns)
 set(LWIP_PATH ${PICO_SDK_PATH}/lib/lwip)
 set(TARGET_FILES        
+    ${CMAKE_CURRENT_SOURCE_DIR}/flash_utils.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/intercom.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/postgresql.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sql_client/md5.c

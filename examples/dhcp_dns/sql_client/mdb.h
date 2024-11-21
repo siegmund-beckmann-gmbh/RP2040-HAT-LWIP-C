@@ -74,7 +74,7 @@ typedef struct __attribute__((packed)) MDBevent{
 	uint8_t Data[60];
 }MDB_EVENT;
 
-typedef struct HOPPERtag{	//20
+typedef struct __attribute__((packed)) HOPPERtag{	//20
 	uint16_t Val;
 	uint16_t Fill;
 	uint16_t LastFill;
@@ -89,13 +89,13 @@ typedef struct HOPPERtag{	//20
 	int32_t  Amount;
 }HOPPER;
 
-typedef struct COINStag{	//8
+typedef struct __attribute__((packed)) COINStag{	//8
 	uint16_t  Count;
 	uint16_t  Credit;
 	int32_t   Amount;
 }COINS;
 
-typedef struct COIN_OVERRIDEtag
+typedef struct __attribute__((packed)) COIN_OVERRIDEtag
 {
 	uint8_t  active;	//10
 	uint8_t  Currency;	
@@ -104,7 +104,7 @@ typedef struct COIN_OVERRIDEtag
 	int32_t  TotalValue;
 }COIN_OVERRIDE;
 
-typedef struct BILL_OVERRIDEtag
+typedef struct __attribute__((packed)) BILL_OVERRIDEtag
 {
 	uint8_t  active;	//14
 	uint8_t  Currency;
@@ -113,19 +113,19 @@ typedef struct BILL_OVERRIDEtag
 	int32_t  TotalValue;
 }BILL_OVERRIDE;
 
-typedef struct TOTAL_CURRENCYtag
+typedef struct __attribute__((packed)) TOTAL_CURRENCYtag
 {
 	int32_t TotalCredit;
 	int32_t TotalValue;
 }TOTAL_CURRENCY;
 
-typedef struct BILLStag{	//8
+typedef struct __attribute__((packed)) BILLStag{	//8
 	uint16_t Count;
 	uint16_t Credit;
 	int32_t  Amount;
 }BILLS;
 
-typedef struct TUBEStag{	//20
+typedef struct __attribute__((packed)) TUBEStag{	//20
 	uint8_t  Prio;
 	uint8_t  Ready;
 	uint16_t Val;
@@ -141,7 +141,7 @@ typedef struct TUBEStag{	//20
 }TUBES;
 
 
-typedef struct SAVEVARtag{
+typedef struct __attribute__((packed)) SAVEVARtag{
 
 	struct HOPPERtag	Hopper[5];			
 	struct COINStag		Coin[16];

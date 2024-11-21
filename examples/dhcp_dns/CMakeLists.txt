@@ -57,3 +57,5 @@ pico_enable_stdio_usb(${TARGET_NAME} 0)
 pico_enable_stdio_uart(${TARGET_NAME} 1)
 
 pico_add_extra_outputs(${TARGET_NAME})
+
+pico_set_linker_script(${TARGET_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/memmap_custom.ld)

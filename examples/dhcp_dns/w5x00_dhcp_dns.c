@@ -37,6 +37,7 @@
 #include "pico/unique_id.h"
 
 #include "hardware/flash.h"
+#include "flash_utils.h"
 
 #include "mdb.h"
 #include "hexdump.h"
@@ -245,13 +246,16 @@ int main()
     gpio_init(DOOR);
     gpio_set_dir(DOOR, GPIO_IN);
 
+    pico_get_unique_board_id(&SystemID);    
+
+    printf("Persistent Memory address = %x", getAddressPersistent());
+
     unsigned char RTCavail = InitClock();
 
     printf("rtc chip ds1307 available= %u \n",RTCavail);
 
     IlluminationInit();
 
-    pico_get_unique_board_id(&SystemID);    
 
     queue_init(&KEYfifo, sizeof(KEY_EVENT), 32);    
     

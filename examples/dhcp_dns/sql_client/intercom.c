@@ -77,6 +77,15 @@ pico_unique_board_id_t SystemID;
 unsigned char IntercomBuf[TCP_MSS];
 unsigned char RelaisStat[MAX_RELAIS];
 
+#define DIRECTOPEN_SIZE 100
+queue_t DIRECTOPENfifo;
+
+unsigned char DirectEntryCounter = 0;
+unsigned char DirectEntryTimeout = 0;
+uint32_t Uuid[4];
+uint16_t OpenOptions = 0;
+#define OPEN_OPTION_SIGNAL_ON_ENTRY 0x1000
+
 /* Functions */
 
 unsigned int CalcCRC(unsigned int StartVal, unsigned char *Buf, unsigned int len)
@@ -120,7 +129,41 @@ void CalcCoinCRC(void){
 	}
 }
 
+void PutOpenQueue(uint32_t uuid1, uint32_t uuid2, uint32_t uuid3, uint32_t uuid4, uint16_t openOptions) {
 
+	DIRECTOPEN event;
+
+	event.uuid[0] = uuid1;
+	event.uuid[1] = uuid2;
+	event.uuid[2] = uuid3;
+	event.uuid[3] = uuid4;
+	event.options = openOptions;
+
+	if (!queue_try_add(&DIRECTOPENfifo, &event)) {
+		printf("DirectOpen fifo full");
+	}			      			
+
+}
+
+bool GetOpenQueue(uint32_t *uuid1, uint32_t *uuid2, uint32_t *uuid3, uint32_t *uuid4, uint16_t *openOptions) {
+    if (!queue_is_empty(&DIRECTOPENfifo)) {
+         DIRECTOPEN event;
+        if (!queue_try_remove(&DIRECTOPENfifo, &event)) {
+            printf("MDB fifo empty");
+			return false;
+        }   
+
+		*uuid1 = event.uuid[0];
+		*uuid2 = event.uuid[1];
+		*uuid3 = event.uuid[2];
+		*uuid4 = event.uuid[3];
+		*openOptions = event.options;
+
+		return true;
+	}
+
+	return false;
+}
 
 void udp_intercom_init() 
 {
@@ -147,6 +190,13 @@ void udp_intercom_init()
 	MsgBufRepeat		= 0;
 	MsgListBufIn		= 0;
 	MsgListBufOut		= 0;
+
+	queue_init(&DIRECTOPENfifo, sizeof(DIRECTOPEN), DIRECTOPEN_SIZE);    
+
+	SysVar.DirEntryTimeout=0;
+	SysVar.DirEntryPause=1;
+	SysVar.DirEntryRepeat=3;
+
 
 }
 
@@ -881,7 +931,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 					SysVar.DirEntryTimeout=*(unsigned char *)datapointer++;
 					SysVar.DirEntryPause=*(unsigned char *)datapointer++;
 					SysVar.DirEntryRepeat=*(unsigned char *)datapointer++;
-					// PutOpenQueue(UUID0,UUID1,UUID2,UUID3,OpenOptions);										
+					PutOpenQueue(UUID0,UUID1,UUID2,UUID3,OpenOptions);										
 				break;
 
 								
@@ -1038,6 +1088,47 @@ uint8_t buf[256];
 
 		} // queue is empty !
 	} // not connected !
+
+	// DirectEntry
+	switch(DirectEntryCounter)
+	{
+		case 128:
+			DirectEntryCounter=1; // pause, then retry
+			DirectEntryTimeout=SysVar.DirEntryTimeout*2;
+			directEntry=1;
+		break;
+		case 2:
+			DirectEntryCounter=0; // pause, then next
+			directEntry=0;
+		break;
+		case 1:
+			if (DirectEntryTimeout) {
+				if(--DirectEntryTimeout==0) {
+					if (SysVar.DirEntryRepeat) {
+						DirectEntryCounter=128+(SysVar.DirEntryPause % 99); // pause, then repeat
+						directEntry=0;
+					}
+					else 
+					{
+						DirectEntryCounter=2+(SysVar.DirEntryPause % 99); // pause, then next
+						directEntry=0;
+					}
+				}
+			}
+		break;
+		case 0:
+			if (GetOpenQueue(&Uuid[0],&Uuid[1],&Uuid[2],&Uuid[3], &OpenOptions)) {
+				DirectEntryCounter=1;
+				directEntry=1;
+				DirectEntryTimeout=SysVar.DirEntryTimeout*2;
+				if (OpenOptions & OPEN_OPTION_SIGNAL_ON_ENTRY) directSignal=true;
+				else directSignal=false;
+			}			
+		break;
+		default:
+			DirectEntryCounter--;
+		break;
+	}
 }
 
 static void udp_message_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port) 

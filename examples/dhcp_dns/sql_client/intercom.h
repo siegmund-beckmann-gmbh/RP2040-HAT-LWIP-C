@@ -145,6 +145,12 @@ typedef struct __attribute__((packed)) APPtag{
 	unsigned int  Version;
 }APP;
 
+typedef struct __attribute__((packed)) OpenQueue{
+	uint32_t  uuid[4];
+	uint16_t  options;
+}DIRECTOPEN;
+
+
 /**
  * ----------------------------------------------------------------------------------------------------
  * Variables
@@ -199,6 +205,9 @@ static void udp_message_received(void *passed_data, struct udp_pcb *upcb, struct
 
 void intercomMessage_poll(void);
 void addMessage(uint16_t id, uint16_t len, uint8_t* data);
+
+void PutOpenQueue(uint32_t uuid1, uint32_t uuid2, uint32_t uuid3, uint32_t uuid4, uint16_t openOptions);
+bool GetOpenQueue(uint32_t *uuid1, uint32_t *uuid2, uint32_t *uuid3, uint32_t *uuid4, uint16_t *openOptions);
 
 
 #endif // _INTERCOM_H_

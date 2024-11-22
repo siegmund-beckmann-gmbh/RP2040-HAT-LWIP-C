@@ -114,9 +114,10 @@ extern bool crc_error_sent;
 /* MDB */
 extern queue_t MDBfifo;
 
-
 extern const APP MyApplication;
 
+extern unsigned char DirectEntryCounter;
+extern uint32_t Uuid[4];
 /* GPIO */
 
 queue_t KEYfifo;
@@ -276,8 +277,17 @@ int main()
 
     printf("rtc chip ds1307 available= %u\n",RTCavail);
 
-    IlluminationInit();
+    if (!gpio_get(PROG_PIN_1)) {
+        printf("  PROG_KEY1 pressed!\n");
+        progPin1State = true;    
+    }
 
+    if (!gpio_get(PROG_PIN_2)) {
+        printf("  PROG_KEY2 pressed!\n");    
+        progPin2State = true;
+    }
+
+    IlluminationInit();
 
     queue_init(&KEYfifo, sizeof(KEY_EVENT), 32);    
     
@@ -394,8 +404,10 @@ int main()
         sys_check_timeouts();
 
         if (timeRead) {
-            //printf("Current RTC: %02u.%02u.20%02u %02u:%02u:%02u\n", TimeRegDEC[4], TimeRegDEC[5],  TimeRegDEC[6], TimeRegDEC[2], TimeRegDEC[1], TimeRegDEC[0]);
             timeRead = false;
+            ReadTimeFromClock();
+            intercomMessage_poll();
+            //printf("Current RTC: %02u.%02u.20%02u %02u:%02u:%02u\n", TimeRegDEC[4], TimeRegDEC[5],  TimeRegDEC[6], TimeRegDEC[2], TimeRegDEC[1], TimeRegDEC[0]);
         }
         
         while(!queue_is_empty(&MDBfifo)) {
@@ -445,16 +457,28 @@ int main()
             switch (evKey.Type)
             {
             case EvTypeKey_Pressed:
-                printf("KEY %d pressed!\n", evKey.Data[0]);
-                addMessage(ICOM_MESSAGE_KEY_PRESSED,1,&evKey.Data[0]);
+                printf("KEY %d pressed!\n", evKey.Data[0]);                
                 if (evKey.Data[0] == 8) trayLight = !trayLight;
-                if (evKey.Data[0] == 9) directEntry = !directEntry;
-                if (evKey.Data[0] == 10) directSignal = !directSignal;
+                // if (evKey.Data[0] == 9) directEntry = !directEntry;
+                if (evKey.Data[0] == 10) {
+                    if (DirectEntryCounter) DirectEntryCounter=2;
+                    uint8_t queueData[16];
+                    *(unaligned_ulong*)&queueData[0]=Uuid[0];
+                    *(unaligned_ulong*)&queueData[4]=Uuid[1];
+                    *(unaligned_ulong*)&queueData[8]=Uuid[2];
+                    *(unaligned_ulong*)&queueData[12]=Uuid[3];
+
+                    addMessage(ICOM_MESSAGE_CMD_QUEUE_ACK,16,&queueData[0]);
+                    break;
+                }
                 if (evKey.Data[0] == 12) relais4 = !relais4;
                 if (evKey.Data[0] == 13) relais5 = !relais5;
+
+                addMessage(ICOM_MESSAGE_KEY_PRESSED,1,&evKey.Data[0]);
             break;
             case EvTypeKey_Released:
                 printf("KEY %d released!\n", evKey.Data[0]);
+                if (evKey.Data[0] == 10) break;
                 addMessage(ICOM_MESSAGE_KEY_RELEASED,1,&evKey.Data[0]);
             break;
             default:
@@ -540,9 +564,7 @@ static void repeating_timer_10ms_callback(void)
     if (++rtc_cnt >= 100) rtc_cnt=0;
 
     if ((rtc_cnt % 50)==0) {
-        ReadTimeFromClock();
         timeRead = true;
-        intercomMessage_poll();
     }
 
     if (rtc_cnt & 0x01) {

@@ -150,6 +150,28 @@ typedef struct __attribute__((packed)) OpenQueue{
 	uint16_t  options;
 }DIRECTOPEN;
 
+typedef struct __attribute__((packed)) CFGtag{
+	uint16_t	CRC;             //2
+	uint8_t		version;         //1
+	uint8_t		dhcpMode;        //1
+	ip_addr_t	lwip_ip;      	 //4
+	ip_addr_t	lwip_netmask; 	 //4
+	ip_addr_t	lwip_gateway; 	 //4
+	uint8_t		systemID[16];    //16
+	uint16_t	CoinFill[16];    //32
+	uint16_t	CoinVal[16];     //32
+	uint16_t	NoteFill[16];    //32
+	uint16_t	NoteVal[16];     //32
+	uint16_t	HopperFill[5];   //10
+	uint16_t	HopperVal[5];    //10
+	uint8_t	    HopperPrio[5];   //5
+	uint8_t		unused[71];      //71
+}CFGTAG;                         //256
+
+typedef union __attribute__((packed))  CFGunion{
+	struct CFGtag CFG;
+	unsigned char data[256];
+}CONFIG;
 
 /**
  * ----------------------------------------------------------------------------------------------------
@@ -157,9 +179,6 @@ typedef struct __attribute__((packed)) OpenQueue{
  * ----------------------------------------------------------------------------------------------------
  */
 extern struct SAVEVARtag SysVar;
-
-extern struct COIN_OVERRIDEtag	CoinOver[16];
-extern struct BILL_OVERRIDEtag BillOver[16];
 
 extern unsigned char CoinIllumAni;
 extern unsigned char BillIllumAni;
@@ -198,7 +217,7 @@ struct udp_pcb *mpcb;
 unsigned int CalcCRC(unsigned int StartVal, unsigned char *Buf, unsigned int len);
 unsigned int CalcCRC2(unsigned char *Buf, unsigned long Buflen);
 
-void CalcCoinCRC(void);
+void CalcCoinCRC(bool writeback, int callID);
 void udp_intercom_init(void);
 static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port);
 static void udp_message_received(void *passed_data, struct udp_pcb *upcb, struct pbuf *p, const struct ip4_addr *addr, u16_t port);
@@ -208,6 +227,11 @@ void addMessage(uint16_t id, uint16_t len, uint8_t* data);
 
 void PutOpenQueue(uint32_t uuid1, uint32_t uuid2, uint32_t uuid3, uint32_t uuid4, uint16_t openOptions);
 bool GetOpenQueue(uint32_t *uuid1, uint32_t *uuid2, uint32_t *uuid3, uint32_t *uuid4, uint16_t *openOptions);
+
+void defaultConfigMem(void);
+void calcCRCConfigMem(void);
+void copyConfigMem2SysVar(void);
+void copySysVar2ConfigMem(void);
 
 
 #endif // _INTERCOM_H_

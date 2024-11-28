@@ -23,6 +23,7 @@
 
 #define DS1307	    0x68 //0xD0
 #define PCF9574_0   0x20 //0x40
+#define EEPROM2402  0x50 //0xA0
 
 // ----Prototype-Declarations--------------------------------------------------------  
 
@@ -32,6 +33,9 @@ void ReadClock();
 void ReadTimeFromClock();
 uint8_t scan_pcf();
 bool isDST(uint32_t sec);
+bool ReadEEPROM(uint8_t *mem);
+bool writeEEPROM(uint8_t *mem);
+bool writeEEPROMbyte(uint8_t adr, uint8_t byte);
 
 
 #endif /* RTC_H */

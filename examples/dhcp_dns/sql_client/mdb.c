@@ -59,9 +59,6 @@ const unsigned char ExpRequestID_Version[2] = {0x10,0x10};
 
 SAVEVARS SysVar;
 
-struct COIN_OVERRIDEtag	CoinOver[16];
-struct BILL_OVERRIDEtag BillOver[16];
-
 EmpTag MDB_Emp;
 
 ChangerTag MDB_Changer1;
@@ -314,7 +311,7 @@ void InitChanger2()
 	
 	MDB_Changer1.DiagnosticCommand=0;		
 
-	CalcCoinCRC();
+	CalcCoinCRC(true,100);
 }
 
 void InitCardreader()
@@ -546,7 +543,7 @@ void InitMDB(void)
  		else	SysVar.Hopper[s].Hysteresis=0;
  	}
 	
-	CalcCoinCRC();
+	CalcCoinCRC(true,101);
 }
 
 void MDBTimeout(void)
@@ -747,7 +744,7 @@ void RX_Handle_Emp(unsigned char buff_point)
 		 SysVar.Hopper[3].Val = (unsigned int)MDB_Emp.CoinCredit[2*s+1] * (unsigned int)MDB_Emp.CoinScaling;
 	  }
 	  
-	  CalcCoinCRC();
+	  CalcCoinCRC(true,101);
 	  
 	  MDB_Emp.NextRequest=CmdEmp_Poll;	//	POLL
 	  break; 	    		
@@ -803,7 +800,7 @@ void RX_Handle_Emp(unsigned char buff_point)
 						SysVar.Coin[channel].Count++;
 	        		}
 					
-					CalcCoinCRC();
+					CalcCoinCRC(true,102);
 					   
 		   			MDBEvent.Type    = EvTypeMDB_EmpCoinInserted;			// Coin inserted
    	   				MDBEvent.Length  = 3;
@@ -990,13 +987,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 			    if (SysVar.Tube[s].Prio<MAX_PRIORITY)
 				{
 		  			SysVar.Tube[s].Val=(unsigned int)MDB_Changer->CoinCredit[MDB_Changer->PhysTubes[s]]*(unsigned int)MDB_Changer->CoinScaling;
-					
-					if (CoinOver[MDB_Changer->PhysTubes[s]].active)
-					{
-						// bei Mehfachwaehrung hier ersetzen ab V3.63
-					    SysVar.Tube[s].Val= CoinOver[MDB_Changer->PhysTubes[s]].Value;
-					}					
-					
+										
 					if (SysVar.Tube[s].Deroute)
 					{
 						if ((SysVar.Tube[s].Deroute-1)<MAX_HOPPER) SysVar.Hopper[SysVar.Tube[s].Deroute-1].Val=SysVar.Tube[s].Val;
@@ -1017,7 +1008,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 			   SysVar.Tube[s].Ready=0;
 		   }	
 		   
-		   CalcCoinCRC();
+		   CalcCoinCRC(true,103);
 		   	   
 	  }
 #endif	
@@ -1041,13 +1032,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 		{
 			MDB_Changer->TubeStatus[s]=MDB_buff[2+s];
       		coinval= (unsigned int)MDB_Changer->CoinScaling * (unsigned int)MDB_Changer->CoinCredit[s];
-			
-			if (CoinOver[s].active)
-			{
-				// bei Mehfachwaehrung hier ersetzen ab V3.63
-			    coinval= CoinOver[s].Value;
-			}
-							
+										
 			for (h=0;h<MDB_MAXCOINS;h++) if (MDB_Changer->PhysTubes[h]==s) break;
 			
 			if (h<MDB_MAXCOINS)
@@ -1155,7 +1140,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 			// s=13 Muenzregister 5bit   s=14 Relaiszustand bit 0-2  s=15 Eingangszustand bit 0/1 Motor�ffner bit 2-4 Optos
 	  	 }	  	 	  	 
 		 
-		 CalcCoinCRC();
+		 CalcCoinCRC(true,104);
 	  }
 	  
 	  if (hChanged)
@@ -1215,7 +1200,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 							if (hop<MAX_HOPPER)
 							{
 		          				SysVar.Hopper[MDB_Changer->Status[s+2] & 0x07].Blocked=1;
-								CalcCoinCRC();
+								CalcCoinCRC(true,105);
 		          				// Timeout PayOut
 		          				// Z2= Rest
 		          				// Z3= Hopper 0x00 - 0x04
@@ -1323,7 +1308,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 	                  	MDB_Changer->LastValue=coinval;
 					  
 	  				 	SysVar.Coin[stat & 0x0F].Count++;
-						CalcCoinCRC();
+						CalcCoinCRC(true,106);
 	                  					  	
 		   	  			MDBEvent.Type    = EvTypeMDB_CoinInCashbox;
    	   		  			MDBEvent.Length  = 3;
@@ -1344,7 +1329,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 							if (SysVar.Tube[k].Deroute) 
 							{
 								SysVar.Hopper[SysVar.Tube[k].Deroute-1].Fill++;
-								CalcCoinCRC(); 
+								CalcCoinCRC(true,107); 
 								sec=1;
 							}
 							else sec=mc-SysVar.Tube[k].Fill;
@@ -1756,13 +1741,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 					break;
 					case 0x70:	//Bill Stacked manually
 						coinval= (unsigned int)MDB_Changer->CoinScaling * (unsigned int)MDB_Changer->CoinCredit[MDB_buff[3] & 0x0F];
-						
-						if (CoinOver[MDB_buff[3] & 0x0F].active)
-						{
-							// bei Mehfachwaehrung hier ersetzen ab V3.63
-						    coinval= CoinOver[MDB_buff[3] & 0x0F].Value;
-						}						
-					
+											
 						for (h=0;h<MDB_MAXCOINS;h++) 
 						 if (coinval==SysVar.BillCredit[h]) 
 						 {						
@@ -1770,7 +1749,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 							break;
 						 }																
 				
-						CalcCoinCRC();
+						CalcCoinCRC(true,108);
 
 						
 		   	  			MDBEvent.Type    = EvTypeMDB_BillStackedManually;
@@ -2292,17 +2271,9 @@ void RX_Handle_Validator(unsigned char buff_point)
 	      {
 	           if((MDB_Validator.Status[s] & 0x80)==0x80) //BILL
 		       { 
-				    // bei Mehfachwaehrung hier ersetzen
-				    if (BillOver[MDB_Validator.Status[s] & 0x0F].active)
-				    {
-				  		MDB_Validator.NoteValue= BillOver[MDB_Validator.Status[s] & 0x0F].Value;
-				    }
-			        else 
-				    {	 
-					    if  (MDB_Validator.BillTypeCredit[MDB_Validator.Status[s] & 0x0F]==0xFF) //ab V2.84
-					    	 MDB_Validator.NoteValue=0xFFFFFFFF;
-  						else MDB_Validator.NoteValue= (unsigned long)MDB_Validator.BillScaling * (unsigned long)MDB_Validator.BillTypeCredit[MDB_Validator.Status[s] & 0x0F];
-  				  	}
+					if  (MDB_Validator.BillTypeCredit[MDB_Validator.Status[s] & 0x0F]==0xFF) //ab V2.84
+						 MDB_Validator.NoteValue=0xFFFFFFFF;
+					else MDB_Validator.NoteValue= (unsigned long)MDB_Validator.BillScaling * (unsigned long)MDB_Validator.BillTypeCredit[MDB_Validator.Status[s] & 0x0F];
 				      		      
  		          	switch(MDB_Validator.Status[s] & 0xF0)					
 		          	{
@@ -2359,7 +2330,7 @@ void RX_Handle_Validator(unsigned char buff_point)
 		                    MDB_Validator.LastValue=MDB_Validator.NoteValue;
 				    		MDB_Validator.NextRequest=CmdValidator_Poll;
 							
-							CalcCoinCRC();
+							CalcCoinCRC(true,109);
 		    				
 				    		MDBEvent.Type    = EvTypeMDB_BillStacked;			// Bill inserted
 	   	   		    		MDBEvent.Length  = 7;
@@ -3938,7 +3909,7 @@ unsigned char amt2[16];
 			}
         }  	        
    
-   		CalcCoinCRC();
+   		CalcCoinCRC(true,110);
 	
     }
   	return 1;	
@@ -3973,11 +3944,8 @@ void SetAKZmax(uint32_t pay, uint8_t changemode)
 #endif
 
  	for (s=0;s<MDB_MAXNOTES;s++)
- 	{
-		// bei Mehfachwaehrung hier ersetzen
-		if (BillOver[s].active)
-		 	 BillAmount= BillOver[s].Value;
-		else BillAmount=(unsigned long)MDB_Validator.BillTypeCredit[s] * (unsigned long)MDB_Validator.BillScaling;
+ 	{		
+		BillAmount=(unsigned long)MDB_Validator.BillTypeCredit[s] * (unsigned long)MDB_Validator.BillScaling;
 		
  		if (BillAmount && pay && MDB_Validator.ready)
  		{
@@ -4116,12 +4084,6 @@ void SetAKZmax(uint32_t pay, uint8_t changemode)
 	
 		CoinAmount=(long)MDB_Changer1.CoinCredit[s] * (long)MDB_Changer1.CoinScaling;
 		
-		if (CoinOver[s].active)
-		{
-			// bei Mehfachwaehrung hier ersetzen ab V3.63
-		    CoinAmount= CoinOver[s].Value;
-		}				
-
  		if ( CoinAmount && pay && MDB_Changer1.ready)
  		{ 					
 			if (DispenseAmount(CoinAmount,1)==1)

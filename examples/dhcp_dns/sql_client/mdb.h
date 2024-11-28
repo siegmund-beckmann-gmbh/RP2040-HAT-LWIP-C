@@ -95,30 +95,6 @@ typedef struct __attribute__((packed)) COINStag{	//8
 	int32_t   Amount;
 }COINS;
 
-typedef struct __attribute__((packed)) COIN_OVERRIDEtag
-{
-	uint8_t  active;	//10
-	uint8_t  Currency;	
-	uint16_t Credit;
-	uint16_t Value;
-	int32_t  TotalValue;
-}COIN_OVERRIDE;
-
-typedef struct __attribute__((packed)) BILL_OVERRIDEtag
-{
-	uint8_t  active;	//14
-	uint8_t  Currency;
-	uint32_t Credit;
-	uint32_t Value;
-	int32_t  TotalValue;
-}BILL_OVERRIDE;
-
-typedef struct __attribute__((packed)) TOTAL_CURRENCYtag
-{
-	int32_t TotalCredit;
-	int32_t TotalValue;
-}TOTAL_CURRENCY;
-
 typedef struct __attribute__((packed)) BILLStag{	//8
 	uint16_t Count;
 	uint16_t Credit;
@@ -626,7 +602,7 @@ void CheckCoinToMain();
 
 void putMDBevent(MDB_EVENT *event);
 
-extern void CalcCoinCRC();
+extern void CalcCoinCRC(bool writeback, int callID);
 
 extern bool trayLight;
 

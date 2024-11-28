@@ -236,7 +236,7 @@ int reg_read(  i2c_inst_t *i2c,
     // Read data from register(s) over I2C
     num_bytes_written = i2c_write_timeout_per_char_us(i2c, addr, &reg, 1, true, 1000);
 
-	if (num_bytes_written != PICO_ERROR_GENERIC) {
+	if (num_bytes_written >= 0) {
     	num_bytes_read = i2c_read_timeout_per_char_us(i2c, addr, buf, nbytes, false, 1000);
 	}
 
@@ -529,7 +529,7 @@ void ScanFRONTRGB(char adr)	//alle 20ms
 	// pack adress and data to String
 	for (int c=0;c<FRONTRGB_Count[adr];c++) sendData[c+1]=FRONTRGB[adr].Data[(FRONTRGB_Adr[adr]+c)];
 	
-    if (i2c_write_timeout_per_char_us(I2C_HW,PCA[adr],&sendData[0],FRONTRGB_Count[adr]+1,false, 1000) == PICO_ERROR_GENERIC) {
+    if (i2c_write_timeout_per_char_us(I2C_HW,PCA[adr],&sendData[0],FRONTRGB_Count[adr]+1,false, 1000) < 0) {
    	   	if(FRONTRGB_Lost[adr])
         {
      	    FRONTRGB_Lost[adr]--;

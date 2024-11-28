@@ -66,13 +66,15 @@ struct ip4_addr callerIP;
 bool IntercomConnected = false;
 
 u8_t crc_error = 0;
+uint16_t oldCOnfigMemCRC = 0;
 bool crc_error_sent = false;
+bool rewriteEEPROM = false;
 
 extern bool trayLight;
 extern bool directEntry;
 extern bool directSignal;
 
-pico_unique_board_id_t SystemID;
+pico_unique_board_id_t FlashID;
 
 unsigned char IntercomBuf[TCP_MSS];
 unsigned char RelaisStat[MAX_RELAIS];
@@ -85,6 +87,8 @@ unsigned char DirectEntryTimeout = 0;
 uint32_t Uuid[4];
 uint16_t OpenOptions = 0;
 #define OPEN_OPTION_SIGNAL_ON_ENTRY 0x1000
+
+CONFIG ConfigMem;
 
 /* Functions */
 
@@ -121,11 +125,20 @@ crc = 0;
   return crc;
 }
 
-void CalcCoinCRC(void){
+void CalcCoinCRC(bool writeback, int callID){
+
+	int oldCRC = SysVar.CRC;
+
 	if (crc_error != 2) {
 		SysVar.CRC = CalcCRC2((char*)&SysVar,356);
 		crc_error_sent = true;
 		crc_error = 0;
+		if (writeback) {
+			if (oldCRC != SysVar.CRC) {
+				printf("CallID(%u) writing SysVar to EEPROM data...\n",callID);
+				copySysVar2ConfigMem();
+			}			
+		}
 	}
 }
 
@@ -163,6 +176,83 @@ bool GetOpenQueue(uint32_t *uuid1, uint32_t *uuid2, uint32_t *uuid3, uint32_t *u
 	}
 
 	return false;
+}
+
+void defaultConfigMem(void) {
+
+	ConfigMem.CFG.version = 1 ;
+	ConfigMem.CFG.dhcpMode = 1 ;	
+	IP4_ADDR(&ConfigMem.CFG.lwip_ip, 192, 168, 190, 99);
+	IP4_ADDR(&ConfigMem.CFG.lwip_netmask, 255, 255, 255, 0);
+	IP4_ADDR(&ConfigMem.CFG.lwip_gateway, 192, 168, 190, 1);
+	
+	for (int i=0;i<16;i++){
+		ConfigMem.CFG.systemID[i]=0;
+		ConfigMem.CFG.CoinFill[i]=0;
+		ConfigMem.CFG.CoinVal[i]=0;
+		ConfigMem.CFG.NoteFill[i]=0;
+		ConfigMem.CFG.NoteVal[i]=0;
+	}
+
+	for (int i=0;i<5;i++){
+		ConfigMem.CFG.HopperFill[i]=0;
+		ConfigMem.CFG.HopperVal[i]=0;
+		ConfigMem.CFG.HopperPrio[i]=5;
+	}
+
+	strcpy(&ConfigMem.CFG.systemID[0],"BEPI-999999");
+
+	for (int i=0;i<sizeof(ConfigMem.CFG.unused);i++) ConfigMem.CFG.unused[i]=0xff;
+
+	ConfigMem.CFG.CRC = CalcCRC2(&ConfigMem.data[2],254);
+
+	printf("Config set default!\n");
+}
+
+void calcCRCConfigMem(void) {
+	
+	ConfigMem.CFG.CRC = CalcCRC2(&ConfigMem.data[2],254);
+}
+
+void copyConfigMem2SysVar(void) {
+
+	for (int i=0;i<16;i++){
+		SysVar.Coin[i].Count  = ConfigMem.CFG.CoinFill[i];
+		SysVar.Coin[i].Credit = ConfigMem.CFG.CoinVal[i];
+		SysVar.Bill[i].Count  = ConfigMem.CFG.NoteFill[i];
+		SysVar.Bill[i].Credit = ConfigMem.CFG.NoteVal[i];
+	}
+
+	for (int i=0;i<5;i++){
+		SysVar.Hopper[i].Fill     = ConfigMem.CFG.HopperFill[i];
+		SysVar.Hopper[i].LastFill = ConfigMem.CFG.HopperFill[i];
+		SysVar.Hopper[i].Val      = ConfigMem.CFG.HopperVal[i];
+		SysVar.Hopper[i].Prio     = ConfigMem.CFG.HopperPrio[i];
+	}
+
+	CalcCoinCRC(false,0);
+
+}
+
+void copySysVar2ConfigMem(void) {
+
+	for (int i=0;i<16;i++){
+		ConfigMem.CFG.CoinFill[i] = SysVar.Coin[i].Count;
+		ConfigMem.CFG.CoinVal[i]  = SysVar.Coin[i].Credit;
+		ConfigMem.CFG.NoteFill[i] = SysVar.Bill[i].Count;
+		ConfigMem.CFG.NoteVal[i]  = SysVar.Bill[i].Credit;
+	}
+
+	for (int i=0;i<5;i++){
+		ConfigMem.CFG.HopperFill[i] = SysVar.Hopper[i].Fill;
+		ConfigMem.CFG.HopperFill[i] = SysVar.Hopper[i].LastFill;
+		ConfigMem.CFG.HopperVal[i]  = SysVar.Hopper[i].Val;
+		ConfigMem.CFG.HopperPrio[i] = SysVar.Hopper[i].Prio;
+	}
+
+	oldCOnfigMemCRC = ConfigMem.CFG.CRC;
+	calcCRCConfigMem();
+	rewriteEEPROM = true;
 }
 
 void udp_intercom_init() 
@@ -384,7 +474,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 															
 					txpointer+=2;
 					
-					CalcCoinCRC();
+					CalcCoinCRC(true,1);
 				break;
 				
 				case ICOM_COMMAND_CHANGER_TOTAL:
@@ -426,7 +516,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 					}				
 										
 					//writeConfigFile(); // V1.38	
-					CalcCoinCRC();
+					CalcCoinCRC(true,2);
 				break;
 				
 				case ICOM_COMMAND_CMD_SET_OUTPUTS:	// V1.24
@@ -507,7 +597,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 					}				
 					
 					//writeConfigFile(); // V1.38	
-					CalcCoinCRC();
+					CalcCoinCRC(true,3);
 				break;				
 				
 				case ICOM_COMMAND_BILL_FILL:
@@ -520,7 +610,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 						txpointer+=2;									
 					}		
 					
-					CalcCoinCRC();
+					CalcCoinCRC(true,4);
 				break;
 				case ICOM_COMMAND_TUBE_FILL:
 					for (s=0;s<MDB_MAXCOINS;s++) 
@@ -562,7 +652,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 						else *txpointer++=SysVar.Hopper[s].Status;
 					}
 				
-					CalcCoinCRC();
+					CalcCoinCRC(true,5);
 				break;
 				case ICOM_COMMAND_HOPPER_VALUES:
 					for (s=0;s<MAX_HOPPER;s++) 
@@ -581,7 +671,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 						else *txpointer++=SysVar.Hopper[s].Status;
 					}
 					
-					CalcCoinCRC(); 
+					CalcCoinCRC(true,6); 
 				break;				
 				case ICOM_COMMAND_CASHBOX_FILL:
 					for (s=0;s<MDB_MAXCOINS;s++) 
@@ -594,7 +684,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 					}								
 					
 					crc_error=0;
-					CalcCoinCRC();
+					CalcCoinCRC(true,7);
 				break;
 				case ICOM_COMMAND_GENERAL_STATUS:
 					check=SystemConfig & 0x0F;
@@ -605,7 +695,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 					*(unaligned_ushort *)txpointer = 0;  //SystemError;
 					txpointer+=2;					
 				
-					txpointer+=sprintf(txpointer,"%s;%s;%s;",(char *)&MyApplication.Name,(char *)&MyApplication.VerInfo,(char *)&SystemID);				
+					txpointer+=sprintf(txpointer,"%s;%s;%s;",(char *)&MyApplication.Name,(char *)&MyApplication.VerInfo,(char *)&ConfigMem.CFG.systemID);				
 				break;
 				
 				case ICOM_COMMAND_CLEAR_MESSAGES:
@@ -838,7 +928,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 															
 					txpointer+=2;	
 					
-					CalcCoinCRC();
+					CalcCoinCRC(true,8);
 															
 				break;
 				

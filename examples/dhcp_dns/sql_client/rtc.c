@@ -4,6 +4,7 @@
  * ============================================================================================ */
  
 #include    "rtc.h" // Header File
+#include "hexdump.h"
 
 //*******************VARIABLES**************************
 
@@ -47,20 +48,20 @@ unsigned char InitClock()
     sendData[0] = 0x07;
     sendData[1] = 0x10;
 
-    if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 2, false, 1000) != PICO_ERROR_GENERIC) {
+    if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 2, false, 1000) >= 0) {
 
         result=1;
 
-        if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 1, true, 1000) != PICO_ERROR_GENERIC) {
+        if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 1, true, 1000) >= 0) {
 
             sendData[0] = 0x00;
         
-            if (i2c_read_timeout_per_char_us(I2C_INTERNAL, DS1307, &TimeReg[0], 1, false, 1000) != PICO_ERROR_GENERIC) {
+            if (i2c_read_timeout_per_char_us(I2C_INTERNAL, DS1307, &TimeReg[0], 1, false, 1000) >= 0) {
 
                 sendData[0] = 0x00;
                 sendData[1] = TimeReg[0] & 0x7f;
 
-                if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 2, false, 1000) != PICO_ERROR_GENERIC) {
+                if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 2, true, 1000) >= 0) {
                 }
             }        
         }
@@ -90,7 +91,7 @@ unsigned char SetClock()
     sendData[6] = TimeReg[5];
     sendData[7] = TimeReg[6];
 
-    if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 8, false, 1000) != PICO_ERROR_GENERIC) {
+    if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 8, false, 1000) >= 0) {
 
         result=1;
     }
@@ -106,9 +107,9 @@ void ReadClock()
 
     sendData[0] = 0x00;
 
-    if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 1, true, 1000) != PICO_ERROR_GENERIC) {
+    if (i2c_write_timeout_per_char_us(I2C_INTERNAL, DS1307, &sendData[0], 1, true, 1000) >= 0) {
 
-        if (i2c_read_timeout_per_char_us(I2C_INTERNAL, DS1307, &TimeReg[0], 7, false, 1000) != PICO_ERROR_GENERIC) {
+        if (i2c_read_timeout_per_char_us(I2C_INTERNAL, DS1307, &TimeReg[0], 7, false, 1000) >= 0) {
             result = 1;
         }
     }
@@ -190,16 +191,67 @@ uint8_t scan_pcf()
 
     sendData[0] = scanVal;
 
-    if (i2c_write_timeout_per_char_us(I2C_INTERNAL, PCF9574_0, &sendData[0], 1, true, 1000) != PICO_ERROR_GENERIC) {
+    if (i2c_write_timeout_per_char_us(I2C_INTERNAL, PCF9574_0, &sendData[0], 1, true, 1000) >= 0) {
 
-        if (i2c_read_timeout_per_char_us(I2C_INTERNAL, PCF9574_0, &sendData[0], 1, false, 1000) != PICO_ERROR_GENERIC) {
+        if (i2c_read_timeout_per_char_us(I2C_INTERNAL, PCF9574_0, &sendData[0], 1, false, 1000) >= 0) {
 
             return sendData[0];
             
         }
     }
+}
 
+bool ReadEEPROM(uint8_t *mem) {
 
+    unsigned char sendData[8];
+    int result;
+    sendData[0] = 0x00;
+
+    result = i2c_write_timeout_per_char_us(I2C_INTERNAL, EEPROM2402, &sendData[0], 1, false, 1000);
+
+    if (result >= 0) {
+        result = i2c_read_timeout_per_char_us(I2C_INTERNAL, EEPROM2402, mem, 256, false, 1000);
+        if (result >= 0) {
+            return true;
+        } else printf("EEPROM read error=%u!\n",result);
+    } else printf("EEPROM no response! err=%u\n",result);
+    
+    return false;
+}
+
+bool writeEEPROMbyte(uint8_t adr, uint8_t byte) {
+
+    unsigned char sendData[2];
+    int result;
+    sendData[0] = adr;
+    sendData[1] = byte;
+
+    result = i2c_write_timeout_per_char_us(I2C_INTERNAL, EEPROM2402, &sendData[0], 2, false, 1000);
+    if (result < 0) {
+        printf("EEPROM write error=%u!\n",result);
+        return false;
+    }
+
+    return true;
+}
+
+bool writeEEPROM(uint8_t *mem) {
+
+    unsigned char sendData[17];
+    int result;
+
+    for (int a=0;a<256;a+=16) {   // page write 16bytes
+        sendData[0] = a;
+        for (int d=0;d<16;d++) sendData[d+1]=mem[a+d];
+        result = i2c_write_timeout_per_char_us(I2C_INTERNAL, EEPROM2402, &sendData[0], 17, false, 1000);
+        if (result < 0) {
+            printf("EEPROM write error=%u!\n",result);
+            return false;
+        }
+        sleep_ms(6);
+    }
+
+    return true;
 }
 
 /****************************************************************************************************************************

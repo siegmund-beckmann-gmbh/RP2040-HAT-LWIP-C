@@ -604,8 +604,9 @@ void HandleMDB(unsigned int by)
 					//Logfile nak
 					
 			   	  	MDBEvent.Type    = EvTypeMDB_NAK;
-	   	   		  	MDBEvent.Length  = 1;
-	   	   		  	MDBEvent.Data[0] = MDB_DeviceCount;
+	   	   		  	MDBEvent.Length  = 2;
+					MDBEvent.Data[0] = 0x08;
+	   	   		  	MDBEvent.Data[1] = MDB_DeviceCount;
 	   	   		  	putMDBevent(&MDBEvent);
 					
 	    	break; 	
@@ -803,10 +804,13 @@ void RX_Handle_Emp(unsigned char buff_point)
 					CalcCoinCRC(true,102);
 					   
 		   			MDBEvent.Type    = EvTypeMDB_EmpCoinInserted;			// Coin inserted
-   	   				MDBEvent.Length  = 3;
-   	   				MDBEvent.Data[0] = coinval;
-   	   				MDBEvent.Data[1] = coinval>>8;
-					MDBEvent.Data[2] = channel;
+   	   				MDBEvent.Length  = 6;
+					MDBEvent.Data[0] = 0x00;
+   	   				MDBEvent.Data[1] = coinval;
+   	   				MDBEvent.Data[2] = coinval>>8;
+					MDBEvent.Data[3] = 0;
+					MDBEvent.Data[4] = 0;
+					MDBEvent.Data[5] = channel;
    	   				putMDBevent(&MDBEvent);
 	   		
    	   				LastCoinToMain = MDB_Emp.CoinToMain;
@@ -822,7 +826,8 @@ void RX_Handle_Emp(unsigned char buff_point)
 	      		 		{
 							
 		   	  				MDBEvent.Type    = EvTypeMDB_EmpStatus;
-   	   		  				MDBEvent.Length  = 1;
+   	   		  				MDBEvent.Length  = 2;
+							MDBEvent.Data[0] = 0x1F;
    	   		  				MDBEvent.Data[1] = (MDB_Emp.Status[s] &0x0F);
    	   		  				putMDBevent(&MDBEvent);
 	      		 		}
@@ -1070,7 +1075,9 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 		if (diff) 
 		{
 			MDBEvent.Type    = EvTypeMDB_ChangerTubeStatusChanged;
-			MDBEvent.Length  = 0;
+			MDBEvent.Length  = 2;
+			MDBEvent.Data[0] = 0x24;
+			MDBEvent.Data[1] = diff;
 			putMDBevent(&MDBEvent);
 		}
 		
@@ -1094,8 +1101,9 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 				{
 					//Hopper eingesteckt
    	  				MDBEvent.Type    = EvTypeMDB_HopperInserted;
- 		  			MDBEvent.Length  = 1;
-   	   		  		MDBEvent.Data[0] = s;
+ 		  			MDBEvent.Length  = 2;
+					MDBEvent.Data[0] = 0x25;
+   	   		  		MDBEvent.Data[1] = s;
 					putMDBevent(&MDBEvent);
 				}
 				
@@ -1146,7 +1154,8 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 	  if (hChanged)
 	  {		
    			MDBEvent.Type    = EvTypeMDB_HopperStatusChanged;
- 		 	MDBEvent.Length  = 0;
+ 		 	MDBEvent.Length  = 1;
+			MDBEvent.Data[0] = 0x28;
 			putMDBevent(&MDBEvent);
 	  }
 	  
@@ -1186,10 +1195,11 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 							{
 		          				// Zaehlung								
 			   	  				MDBEvent.Type    = EvTypeMDB_HopperCounted;
-	   	   		  				MDBEvent.Length  = 3;
-	   	   		  				MDBEvent.Data[0] = MDB_Changer->Status[s] & 0x07;	//Hopper
-	   	   		  				MDBEvent.Data[1] = MDB_Changer->Status[s+1];
-	   	   		  				MDBEvent.Data[2] = MDB_Changer->Status[s+2];
+	   	   		  				MDBEvent.Length  = 4;
+								MDBEvent.Data[0] = 0x22;
+	   	   		  				MDBEvent.Data[1] = MDB_Changer->Status[s] & 0x07;	//Hopper
+	   	   		  				MDBEvent.Data[2] = MDB_Changer->Status[s+1];
+	   	   		  				MDBEvent.Data[3] = MDB_Changer->Status[s+2];
 	   	   		  				putMDBevent(&MDBEvent);
 							}
 	          			}
@@ -1206,9 +1216,10 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 		          				// Z3= Hopper 0x00 - 0x04
 								
 			   	  				MDBEvent.Type    = EvTypeMDB_HopperTimeout;
-	   	   		  				MDBEvent.Length  = 2;
-	   	   		  				MDBEvent.Data[0] = MDB_Changer->Status[s+1];
-	   	   		  				MDBEvent.Data[1] = MDB_Changer->Status[s+2] & 0x07;
+	   	   		  				MDBEvent.Length  = 3;
+								MDBEvent.Data[0] = 0x20;
+	   	   		  				MDBEvent.Data[1] = MDB_Changer->Status[s+1];
+	   	   		  				MDBEvent.Data[2] = MDB_Changer->Status[s+2] & 0x07;
 	   	   		  				putMDBevent(&MDBEvent);
 							}
 	          			}
@@ -1223,9 +1234,10 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 		          				// Z3= Hopper 0x00 - 0x04
 								
 			   	  				MDBEvent.Type    = EvTypeMDB_HopperPaidOut;
-	   	   		  				MDBEvent.Length  = 2;
-	   	   		  				MDBEvent.Data[0] = MDB_Changer->Status[s+1];
-	   	   		  				MDBEvent.Data[1] = MDB_Changer->Status[s+2] & 0x07;
+	   	   		  				MDBEvent.Length  = 3;
+								MDBEvent.Data[0] = 0x30;
+	   	   		  				MDBEvent.Data[1] = MDB_Changer->Status[s+1];
+	   	   		  				MDBEvent.Data[2] = MDB_Changer->Status[s+2] & 0x07;
 	   	   		  				putMDBevent(&MDBEvent);
 							}
 	          			}
@@ -1239,8 +1251,9 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 		          				// Z3= Hopper 0x00 - 0x04
 								
 			   	  				MDBEvent.Type    = EvTypeMDB_HopperRemoved;
-	   	   		  				MDBEvent.Length  = 1;
-	   	   		  				MDBEvent.Data[0] = MDB_Changer->Status[s+2] & 0x07;
+	   	   		  				MDBEvent.Length  = 2;
+								MDBEvent.Data[0] = 0x21;
+	   	   		  				MDBEvent.Data[1] = MDB_Changer->Status[s+2] & 0x07;
 	   	   		  				putMDBevent(&MDBEvent);
 							}
 	          			}	
@@ -1276,7 +1289,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 							MDBEvent.Type    = EvTypeMDB_ChangerStatus;
 							MDBEvent.Length  = 2;
 							if (MDB_Changer == pMDB_Changer2)
-								MDBEvent.Data[0] = 0x16;
+								 MDBEvent.Data[0] = 0x16;
 							else MDBEvent.Data[0] = 0x10;
 							MDBEvent.Data[1] = MDB_Changer->Status[s];
 							putMDBevent(&MDBEvent);
@@ -1311,10 +1324,14 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 						CalcCoinCRC(true,106);
 	                  					  	
 		   	  			MDBEvent.Type    = EvTypeMDB_CoinInCashbox;
-   	   		  			MDBEvent.Length  = 3;
-   	   		  			MDBEvent.Data[0] = coinval;
-   	   		  			MDBEvent.Data[1] = coinval>>8;
-						MDBEvent.Data[2] = stat & 0x0F;
+	   	   		  		MDBEvent.Length  = 7;
+	   	   		  		MDBEvent.Data[0] = 0;
+	   	   		  		MDBEvent.Data[1] = coinval;
+	   	   		  		MDBEvent.Data[2] = coinval>>8;
+						MDBEvent.Data[3] = 0;
+						MDBEvent.Data[4] = 0;
+						MDBEvent.Data[5] = stat & 0x0F;
+						MDBEvent.Data[6] = 0;
    	   		  			putMDBevent(&MDBEvent);
 							                  
 		          	break;
@@ -1340,11 +1357,14 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 						}
 										 						 
 			   	  		MDBEvent.Type    = EvTypeMDB_CoinInTube;
-	   	   		  		MDBEvent.Length  = 4;
-	   	   		  		MDBEvent.Data[0] = coinval;
-	   	   		  		MDBEvent.Data[1] = coinval>>8;
-						MDBEvent.Data[2] = stat & 0x0F;
-						MDBEvent.Data[3] = sec;
+	   	   		  		MDBEvent.Length  = 7;
+	   	   		  		MDBEvent.Data[0] = 1;
+	   	   		  		MDBEvent.Data[1] = coinval;
+	   	   		  		MDBEvent.Data[2] = coinval>>8;
+						MDBEvent.Data[3] = 0;
+						MDBEvent.Data[4] = 0;
+						MDBEvent.Data[5] = stat & 0x0F;
+						MDBEvent.Data[6] = sec;
 							
 	   	   		  		putMDBevent(&MDBEvent);
 						
@@ -1355,11 +1375,14 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 						if ((stat==0x75) && (mc==0x07)) // Recycler F�llstands�nderung
 						{							
 			   	  			MDBEvent.Type    = EvTypeMDB_CoinRejected;
-	   	   		  			MDBEvent.Length  = 4;
-	   	   		  			MDBEvent.Data[0] = coinval;
-	   	   		  			MDBEvent.Data[1] = coinval>>8;
-							MDBEvent.Data[2] = stat;
-							MDBEvent.Data[3] = mc;
+	   	   		  		MDBEvent.Length  = 7;
+	   	   		  		MDBEvent.Data[0] = 0x0C;
+	   	   		  		MDBEvent.Data[1] = coinval;
+	   	   		  		MDBEvent.Data[2] = coinval>>8;
+						MDBEvent.Data[3] = 0;
+						MDBEvent.Data[4] = 0;
+						MDBEvent.Data[5] = stat;
+						MDBEvent.Data[6] = mc;
 							
    	   		  				putMDBevent(&MDBEvent);
 						}
@@ -1385,11 +1408,14 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 						}						
 						
 		   	  			MDBEvent.Type    = EvTypeMDB_CoinDispensedManually;
-   	   		  			MDBEvent.Length  = 4;
-   	   		  			MDBEvent.Data[0] = coinval;
-   	   		  			MDBEvent.Data[1] = coinval>>8;
-						MDBEvent.Data[2] = stat & 0x0F;
-						MDBEvent.Data[3] = ((stat & 0x70)>>4);
+	   	   		  		MDBEvent.Length  = 7;
+	   	   		  		MDBEvent.Data[0] = 0x0B;
+	   	   		  		MDBEvent.Data[1] = coinval;
+	   	   		  		MDBEvent.Data[2] = coinval>>8;
+						MDBEvent.Data[3] = 0;
+						MDBEvent.Data[4] = 0;
+						MDBEvent.Data[5] = stat & 0x0F;
+						MDBEvent.Data[6] = ((stat & 0x70)>>4);
 
    	   		  			putMDBevent(&MDBEvent);						
 					
@@ -1603,9 +1629,10 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 				{
 					
 	   	  			MDBEvent.Type    = EvTypeMDB_ChangerProblem;
-	   		  		MDBEvent.Length  = 2;
-	   		  		MDBEvent.Data[0] = MDB_Changer->Problem;
-	   		  		MDBEvent.Data[1] = MDB_buff[s+1];
+	   		  		MDBEvent.Length  = 3;
+					MDBEvent.Data[0] = 0x15;
+	   		  		MDBEvent.Data[1] = MDB_Changer->Problem;
+	   		  		MDBEvent.Data[2] = MDB_buff[s+1];
 	   		  		putMDBevent(&MDBEvent);
 				}		
 			}
@@ -1753,11 +1780,14 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 
 						
 		   	  			MDBEvent.Type    = EvTypeMDB_BillStackedManually;
-   	   		  			MDBEvent.Length  = 4;
-   	   		  			MDBEvent.Data[0] = coinval;
-   	   		  			MDBEvent.Data[1] = coinval>>8;
-						MDBEvent.Data[2] = MDB_buff[4];
-						MDBEvent.Data[3] = MDB_buff[3] & 0x0F;
+	   	   		  		MDBEvent.Length  = 7;
+	   	   		  		MDBEvent.Data[0] = 0x0D;
+	   	   		  		MDBEvent.Data[1] = coinval;
+	   	   		  		MDBEvent.Data[2] = coinval>>8;
+						MDBEvent.Data[3] = 0;
+						MDBEvent.Data[4] = 0;
+						MDBEvent.Data[5] = MDB_buff[4];
+						MDBEvent.Data[6] = MDB_buff[3] & 0x0F;
    	   		  			putMDBevent(&MDBEvent);				
 						
 						MDB_Changer->NextRequest=CmdChanger_TubeStatus;												 
@@ -1929,8 +1959,9 @@ unsigned char Handle_Cardreader_Status(unsigned char buffpos,unsigned char buffl
 	  	  	
 	    MDBEvent.Type    = EvTypeMDB_CardreaderDisplay;			// DisplayEvent
 		MDBEvent.Length  = (SetupConfigData_Columns*SetupConfigData_Rows)+1;
+		MDBEvent.Data[0]= 0x07;
 		for (s=0;s<(SetupConfigData_Columns*SetupConfigData_Rows);s++) MDBEvent.Data[s]=MDB_buff[buffpos+2+s];
-		MDBEvent.Data[s]= 0;		
+		MDBEvent.Data[s+1]= 0;		
    	   	putMDBevent(&MDBEvent);		
 		
 	  buffpos=buffpos+(SetupConfigData_Columns*SetupConfigData_Rows)+1;		
@@ -1985,23 +2016,27 @@ unsigned char Handle_Cardreader_Status(unsigned char buffpos,unsigned char buffl
 		sprintf(MDB_Cardreader.DisplayData,"%d",MDB_Cardreader.DispFundsAvailable);
 		MDB_Cardreader.DisplayCount=0;
 						
+		/*				
     	MDBEvent.Type    = EvTypeMDB_CardreaderDisplay;			// DisplayEvent
 		MDBEvent.Length  = strlen(MDB_Cardreader.DisplayData)+1;
+		MDBEvent.Data[0]= 0x07;
 		for (s=0;s<strlen(MDB_Cardreader.DisplayData);s++) MDBEvent.Data[s]=MDB_Cardreader.DisplayData[s];
-		MDBEvent.Data[s]= 0;		
+		MDBEvent.Data[s+1]= 0;		
    	   	putMDBevent(&MDBEvent);				
+		*/
 	
     	MDBEvent.Type    = EvTypeMDB_CardreaderFunds;			// FundsEvent
-		MDBEvent.Length  = 9;
-		MDBEvent.Data[0] = (MDB_Cardreader.DispFundsAvailable & 0xFF);
-		MDBEvent.Data[1] = ((MDB_Cardreader.DispFundsAvailable >> 8) & 0xFF);
-		MDBEvent.Data[2] = ((MDB_Cardreader.DispFundsAvailable >> 16) & 0xFF);
-		MDBEvent.Data[3] = ((MDB_Cardreader.DispFundsAvailable >> 24) & 0xFF);
-		MDBEvent.Data[4] = MDB_Cardreader.PaymentMediaID.B[0];
-		MDBEvent.Data[5] = MDB_Cardreader.PaymentMediaID.B[1];
-		MDBEvent.Data[6] = MDB_Cardreader.PaymentMediaID.B[2];
-		MDBEvent.Data[7] = MDB_Cardreader.PaymentMediaID.B[3];
-		MDBEvent.Data[8] = MDB_Cardreader.PaymentType;		
+		MDBEvent.Length  = 10;
+		MDBEvent.Data[0] = 0x17;
+		MDBEvent.Data[1] = (MDB_Cardreader.DispFundsAvailable & 0xFF);
+		MDBEvent.Data[2] = ((MDB_Cardreader.DispFundsAvailable >> 8) & 0xFF);
+		MDBEvent.Data[3] = ((MDB_Cardreader.DispFundsAvailable >> 16) & 0xFF);
+		MDBEvent.Data[4] = ((MDB_Cardreader.DispFundsAvailable >> 24) & 0xFF);
+		MDBEvent.Data[5] = MDB_Cardreader.PaymentMediaID.B[0];
+		MDBEvent.Data[6] = MDB_Cardreader.PaymentMediaID.B[1];
+		MDBEvent.Data[7] = MDB_Cardreader.PaymentMediaID.B[2];
+		MDBEvent.Data[8] = MDB_Cardreader.PaymentMediaID.B[3];
+		MDBEvent.Data[9] = MDB_Cardreader.PaymentType;		
    	   	putMDBevent(&MDBEvent);
 		
 		MDB_Cardreader.Sequence=Cardreader_Sequence_SESSION;
@@ -2028,11 +2063,12 @@ unsigned char Handle_Cardreader_Status(unsigned char buffpos,unsigned char buffl
 		//DoPaying
 		
 	   	MDBEvent.Type    = EvTypeMDB_CardreaderVendApproved;			// Geldkarte VendApproved
- 	   	MDBEvent.Length  = 4;
-   	   	MDBEvent.Data[0] = MDB_Cardreader.VendAmount;
-   	   	MDBEvent.Data[1] = MDB_Cardreader.VendAmount>>8;
-		MDBEvent.Data[2] = MDB_Cardreader.VendAmount>>16;
-		MDBEvent.Data[3] = MDB_Cardreader.VendAmount>>24;			  
+ 	   	MDBEvent.Length  = 5;
+		MDBEvent.Data[0] = 0x06;
+   	   	MDBEvent.Data[1] = MDB_Cardreader.VendAmount;
+   	   	MDBEvent.Data[2] = MDB_Cardreader.VendAmount>>8;
+		MDBEvent.Data[3] = MDB_Cardreader.VendAmount>>16;
+		MDBEvent.Data[4] = MDB_Cardreader.VendAmount>>24;			  
    	    putMDBevent(&MDBEvent);
 		
 		MDB_Cardreader.NextRequest=CmdCardreader_VendSuccess;
@@ -2043,11 +2079,12 @@ unsigned char Handle_Cardreader_Status(unsigned char buffpos,unsigned char buffl
 		MDB_Cardreader.NextRequest=CmdCardreader_VendSessionComplete;	
 		
 	   	MDBEvent.Type    = EvTypeMDB_CardreaderVendDenied;			// Geldkarte VendDenied
- 	   	MDBEvent.Length  = 4;
-   	   	MDBEvent.Data[0] = MDB_Cardreader.VendAmount;
-   	   	MDBEvent.Data[1] = MDB_Cardreader.VendAmount>>8;
-		MDBEvent.Data[2] = MDB_Cardreader.VendAmount>>16;
-		MDBEvent.Data[3] = MDB_Cardreader.VendAmount>>24;			  
+ 	   	MDBEvent.Length  = 5;
+		MDBEvent.Data[0] = 0x1E;
+   	   	MDBEvent.Data[1] = MDB_Cardreader.VendAmount;
+   	   	MDBEvent.Data[2] = MDB_Cardreader.VendAmount>>8;
+		MDBEvent.Data[3] = MDB_Cardreader.VendAmount>>16;
+		MDBEvent.Data[4] = MDB_Cardreader.VendAmount>>24;			  
    	    putMDBevent(&MDBEvent);
 		
 	  break;
@@ -2106,7 +2143,8 @@ unsigned char Handle_Cardreader_Status(unsigned char buffpos,unsigned char buffl
 	  	// Hier Ready Event
 		
 	  	MDBEvent.Type    = EvTypeMDB_CardreaderReady;			
- 	   	MDBEvent.Length  = 0;
+ 	   	MDBEvent.Length  = 1;
+		MDBEvent.Data[0] = 0x1D;
    	    putMDBevent(&MDBEvent);
 	  
 	  break;
@@ -2118,8 +2156,9 @@ unsigned char Handle_Cardreader_Status(unsigned char buffpos,unsigned char buffl
 	  	// Hier Error Event
 		
 	  	MDBEvent.Type    = EvTypeMDB_CardreaderError;			
- 	   	MDBEvent.Length  = 1;
-   	   	MDBEvent.Data[0] = MDB_Cardreader.ErrorCode;
+ 	   	MDBEvent.Length  = 2;
+		MDBEvent.Data[0] = 0x12;
+   	   	MDBEvent.Data[1] = MDB_Cardreader.ErrorCode;
    	    putMDBevent(&MDBEvent);
 	  
 	  break;
@@ -2190,9 +2229,10 @@ unsigned char Handle_Cardreader_Status(unsigned char buffpos,unsigned char buffl
 				// if (MDB_Cardreader.AVSFeature1 & 0x10) AgeVerified=1;
 				
 		    	MDBEvent.Type    = EvTypeMDB_CardreaderAgeVerificationStatus;			// DisplayEvent
-				MDBEvent.Length  = 2;
-				MDBEvent.Data[0]= MDB_Cardreader.AVSFeature1;
-				MDBEvent.Data[1]= MDB_Cardreader.AVSFeature2;		
+				MDBEvent.Length  = 3;
+				MDBEvent.Data[0] = 0x0A;
+				MDBEvent.Data[1]= MDB_Cardreader.AVSFeature1;
+				MDBEvent.Data[2]= MDB_Cardreader.AVSFeature2;		
 		   	   	putMDBevent(&MDBEvent);
 			}
 	  	}
@@ -2306,13 +2346,14 @@ void RX_Handle_Validator(unsigned char buff_point)
 		              	}
 		              							
 	    				MDBEvent.Type    = EvTypeMDB_BillInEscrow;			// Escrow Start
-		    			MDBEvent.Length  = 6;
-   	   		    		MDBEvent.Data[0] = MDB_Validator.NoteValue;
-   	   		    		MDBEvent.Data[1] = MDB_Validator.NoteValue>>8;
-   	   		    		MDBEvent.Data[2] = MDB_Validator.NoteValue>>16;
-   	   		    		MDBEvent.Data[3] = MDB_Validator.NoteValue>>24;
-						MDBEvent.Data[4] = MDB_Validator.EscrowStatus;
-						MDBEvent.Data[5] = MDB_Validator.Status[s] & 0x0F;
+		    			MDBEvent.Length  = 7;
+						MDBEvent.Data[0] = 0x03;
+   	   		    		MDBEvent.Data[1] = MDB_Validator.NoteValue;
+   	   		    		MDBEvent.Data[2] = MDB_Validator.NoteValue>>8;
+   	   		    		MDBEvent.Data[3] = MDB_Validator.NoteValue>>16;
+   	   		    		MDBEvent.Data[4] = MDB_Validator.NoteValue>>24;
+						MDBEvent.Data[5] = MDB_Validator.EscrowStatus;
+						MDBEvent.Data[6] = MDB_Validator.Status[s] & 0x0F;
    	   		    		putMDBevent(&MDBEvent);
 		              	
 		            	MDB_Validator.NextRequest=CmdValidator_Escrow;
@@ -2333,14 +2374,15 @@ void RX_Handle_Validator(unsigned char buff_point)
 							CalcCoinCRC(true,109);
 		    				
 				    		MDBEvent.Type    = EvTypeMDB_BillStacked;			// Bill inserted
-	   	   		    		MDBEvent.Length  = 7;
-	   	   		    		MDBEvent.Data[0] = MDB_Validator.NoteValue;
-	   	   		    		MDBEvent.Data[1] = MDB_Validator.NoteValue>>8;
-	   	   		    		MDBEvent.Data[2] = MDB_Validator.NoteValue>>16;
-	   	   		    		MDBEvent.Data[3] = MDB_Validator.NoteValue>>24;
-	   	   		    		MDBEvent.Data[4] = MDB_Validator.EscrowTimeout;
-	   	   		    		MDBEvent.Data[5] = MDB_Validator.EscrowTimeout>>8;
-							MDBEvent.Data[6] = MDB_Validator.Status[s] & 0x0F;
+	   	   		    		MDBEvent.Length  = 8;
+							MDBEvent.Data[0] = 0x02;
+	   	   		    		MDBEvent.Data[1] = MDB_Validator.NoteValue;
+	   	   		    		MDBEvent.Data[2] = MDB_Validator.NoteValue>>8;
+	   	   		    		MDBEvent.Data[3] = MDB_Validator.NoteValue>>16;
+	   	   		    		MDBEvent.Data[4] = MDB_Validator.NoteValue>>24;
+	   	   		    		MDBEvent.Data[5] = MDB_Validator.EscrowTimeout;
+	   	   		    		MDBEvent.Data[6] = MDB_Validator.EscrowTimeout>>8;
+							MDBEvent.Data[7] = MDB_Validator.Status[s] & 0x0F;
 	   	   		    		putMDBevent(&MDBEvent);
 
 	                    	MDB_Validator.EscrowTimeout=0;
@@ -2350,14 +2392,15 @@ void RX_Handle_Validator(unsigned char buff_point)
 	              case 0xA0 :	//BILL Returned
 					  						
 					    MDBEvent.Type    = EvTypeMDB_BillReturned;
-		   	   		    MDBEvent.Length  = 7;
-		   	   		    MDBEvent.Data[0] = MDB_Validator.NoteValue;
-		   	   		    MDBEvent.Data[1] = MDB_Validator.NoteValue>>8;
-   	   		    		MDBEvent.Data[2] = MDB_Validator.NoteValue>>16;
-   	   		    		MDBEvent.Data[3] = MDB_Validator.NoteValue>>24;						
-		   	   		    MDBEvent.Data[4] = MDB_Validator.EscrowTimeout;
-		   	   		    MDBEvent.Data[5] = MDB_Validator.EscrowTimeout>>8;
-						MDBEvent.Data[6] = MDB_Validator.Status[s] & 0x0F;
+		   	   		    MDBEvent.Length  = 8;
+						MDBEvent.Data[0] = 0x04;
+		   	   		    MDBEvent.Data[1] = MDB_Validator.NoteValue;
+		   	   		    MDBEvent.Data[2] = MDB_Validator.NoteValue>>8;
+   	   		    		MDBEvent.Data[3] = MDB_Validator.NoteValue>>16;
+   	   		    		MDBEvent.Data[4] = MDB_Validator.NoteValue>>24;						
+		   	   		    MDBEvent.Data[5] = MDB_Validator.EscrowTimeout;
+		   	   		    MDBEvent.Data[6] = MDB_Validator.EscrowTimeout>>8;
+						MDBEvent.Data[7] = MDB_Validator.Status[s] & 0x0F;
 		   	   		    putMDBevent(&MDBEvent);
    	   		    
 	                    MDB_Validator.EscrowStatus=0;
@@ -2368,14 +2411,15 @@ void RX_Handle_Validator(unsigned char buff_point)
 		          case 0xC0 :	//Disabled BILL Rejected
 				  						
 					    MDBEvent.Type    = EvTypeMDB_BillRejected;
-		   	   		    MDBEvent.Length  = 7;
-		   	   		    MDBEvent.Data[0] = MDB_Validator.NoteValue;
-		   	   		    MDBEvent.Data[1] = MDB_Validator.NoteValue>>8;
-   	   		    		MDBEvent.Data[2] = MDB_Validator.NoteValue>>16;
-   	   		    		MDBEvent.Data[3] = MDB_Validator.NoteValue>>24;						
-		   	   		    MDBEvent.Data[4] = MDB_Validator.EscrowTimeout;
-		   	   		    MDBEvent.Data[5] = MDB_Validator.EscrowTimeout>>8;
-						MDBEvent.Data[6] = MDB_Validator.Status[s] & 0x0F;
+		   	   		    MDBEvent.Length  = 8;
+						MDBEvent.Data[0] = 0x05;
+		   	   		    MDBEvent.Data[1] = MDB_Validator.NoteValue;
+		   	   		    MDBEvent.Data[2] = MDB_Validator.NoteValue>>8;
+   	   		    		MDBEvent.Data[3] = MDB_Validator.NoteValue>>16;
+   	   		    		MDBEvent.Data[4] = MDB_Validator.NoteValue>>24;						
+		   	   		    MDBEvent.Data[5] = MDB_Validator.EscrowTimeout;
+		   	   		    MDBEvent.Data[6] = MDB_Validator.EscrowTimeout>>8;
+						MDBEvent.Data[7] = MDB_Validator.Status[s] & 0x0F;
 		   	   		    putMDBevent(&MDBEvent);
    	   		    
 			            MDB_Validator.EscrowStatus=0;
@@ -2902,10 +2946,15 @@ void TX_Handle_Changer(ChangerTag *MDB_Changer,unsigned int adr)
       	if(MDB_Changer->DevLost==0) 
         {     		
   			MDBEvent.Type    = EvTypeMDB_ChangerLost;			// MDBEvent
-  			MDBEvent.Length  = 1;
-			if (adr==MDB_Adr_Changer1)
-				 MDBEvent.Data[0]=1;
-			else MDBEvent.Data[0]=2;
+  			MDBEvent.Length  = 2;
+			if (adr==MDB_Adr_Changer1) {
+				MDBEvent.Data[0] = 0x10;
+				MDBEvent.Data[1] = 0x20;
+			}
+			else {
+				MDBEvent.Data[0] = 0x16;
+				MDBEvent.Data[1] = 0x20;
+			}
   			putMDBevent(&MDBEvent);
 
 		#if (TUBE_CHANGER==1)        	
@@ -2996,9 +3045,10 @@ void TX_Handle_Changer(ChangerTag *MDB_Changer,unsigned int adr)
         	TxMDB_Chk();			
 						               
 			MDBEvent.Type    = EvTypeMDB_ChangerDispenseInfo;
-  			MDBEvent.Length  = 2;
-  			MDBEvent.Data[0] = TubeNo;
-			MDBEvent.Data[1] = TubeCount;
+  			MDBEvent.Length  = 3;
+			MDBEvent.Data[0] = 0x10;
+  			MDBEvent.Data[1] = 0x11;
+			MDBEvent.Data[2] = MDB_Changer->Dispense;
   			putMDBevent(&MDBEvent);
        	}
       	else       	
@@ -3027,8 +3077,9 @@ void TX_Handle_Changer(ChangerTag *MDB_Changer,unsigned int adr)
         TxMDB_Chk();
 		        
 		MDBEvent.Type    = EvTypeMDB_ChangerExpandedPayout;
-  		MDBEvent.Length  = 1;
-  		MDBEvent.Data[0] = MDB_Changer->Payout;
+  		MDBEvent.Length  = 2;
+		MDBEvent.Data[0] = 0x14;
+  		MDBEvent.Data[1] = MDB_Changer->Payout;
   		putMDBevent(&MDBEvent);
 		
         break; 	    		

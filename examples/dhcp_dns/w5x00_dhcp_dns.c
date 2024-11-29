@@ -460,7 +460,7 @@ int main()
         
         while(!queue_is_empty(&MDBfifo)) {
             MDB_EVENT ev;
-            unsigned int coinval;
+            unsigned int coinval, noteval;
 
             if (!queue_try_remove(&MDBfifo, &ev)) {
                 printf("MDB fifo empty");
@@ -480,13 +480,45 @@ int main()
                 break;
             
             case EvTypeMDB_CoinInTube:
-                coinval=(ev.Data[0] + ev.Data[1]*256);
-                printf("Coin %d in Tube - channel %d \n",coinval,ev.Data[2]);
+                coinval=(ev.Data[1] + ev.Data[2]*256);
+                printf("Coin %d in Tube - channel %d \n",coinval,ev.Data[5]);
+                addMessage(ICOM_MESSAGE_COIN_ACCEPTED,7,&ev.Data[0]);
+                break;
+
+            case EvTypeMDB_CoinInCashbox:
+                coinval=(ev.Data[1] + ev.Data[2]*256);
+                printf("Coin %d in Cashbox - channel %d \n",coinval,ev.Data[5]);
+                addMessage(ICOM_MESSAGE_COIN_ACCEPTED,7,&ev.Data[0]);
+                break;
+
+            case EvTypeMDB_CoinDispensedManually:
+                coinval=(ev.Data[1] + ev.Data[2]*256);
+                printf("Coin %d in Cashbox - channel %d \n",coinval,ev.Data[5]);
+                addMessage(ICOM_MESSAGE_COIN_DISPENSED,7,&ev.Data[0]);
                 break;
 
             case EvTypeMDB_ChangerLost:
                 printf("Changer %02X lost\n", ev.Data[0]);
                 break;
+
+            case EvTypeMDB_BillStacked:
+                noteval=(ev.Data[1] + ev.Data[2]*0x100 + ev.Data[3]*0x10000 + ev.Data[4]*0x1000000);
+                printf("Bill %d accepted - channel %d \n",coinval,ev.Data[7]);
+                addMessage(ICOM_MESSAGE_BILL_ACCEPTED,8,&ev.Data[0]);
+                break;
+
+            case EvTypeMDB_BillInEscrow:
+                noteval=(ev.Data[1] + ev.Data[2]*0x100 + ev.Data[3]*0x10000 + ev.Data[4]*0x1000000);
+                printf("Bill %d in escrow - channel %d \n",coinval,ev.Data[6]);                
+                break;
+
+            case EvTypeMDB_BillRejected:
+            case EvTypeMDB_BillReturned:
+                noteval=(ev.Data[1] + ev.Data[2]*0x100 + ev.Data[3]*0x10000 + ev.Data[4]*0x1000000);
+                printf("Bill %d rejected - channel %d \n",coinval,ev.Data[7]);
+                addMessage(ICOM_MESSAGE_BILL_REJECTED,8,&ev.Data[0]);
+                break;
+
 
             default:
                 printf("MDB Event %d Length %d\n", ev.Type, ev.Length);

@@ -124,6 +124,7 @@ extern uint32_t Uuid[4];
 extern bool IntercomConnected;
 extern bool rewriteEEPROM;
 extern uint16_t oldCOnfigMemCRC;
+
 /* GPIO */
 
 queue_t KEYfifo;
@@ -220,6 +221,7 @@ int main()
     struct pbuf *p = NULL;
     err_t status = ERR_VAL;
     err_t old_status = ERR_OK;
+    char str[256];
 
     set_clock_khz();
 
@@ -477,6 +479,55 @@ int main()
                 break;
             case EvTypeMDB_ChangerStatus:
                 printf("Changer %02X Status %02X\n", ev.Data[0],ev.Data[1]); // Display character in the console
+                addMessage(ICOM_MESSAGE_CHANGER_ERROR,1,&ev.Data[1]);
+                break;
+            case EvTypeMDB_ChangerLost:
+                printf("Changer %02X lost\n", ev.Data[0]);
+                addMessage(ICOM_MESSAGE_CHANGER_ERROR,1,&ev.Data[1]);
+                break;
+            case EvTypeMDB_ChangerProblem:
+                printf("Changer %02X error %02X\n", ev.Data[0], ev.Data[1]);
+                if (MDB_Changer1.TubesRead) addMessage(ICOM_MESSAGE_TUBE_ERROR,2,&ev.Data[0]);
+                break;
+            case EvTypeMDB_ChangerTubeStatusChanged:
+				if (ev.Data[1]){ // diff>0
+					
+					char* strpointer=&str[0];
+					
+					for (int s=0;s<MDB_MAXCOINS;s++) 
+					{
+                        int k;
+					  	for (k=0;k<MDB_MAXCOINS;k++)
+						 if (MDB_Changer1.PhysTubes[k]==s) break;
+						 
+						if (k<MDB_MAXCOINS) 
+						{
+							if (SysVar.Tube[k].Deroute)			
+							{	
+								if (SysVar.Tube[k].Deroute<=MAX_HOPPER)
+								 	 *(unaligned_ushort *)strpointer=SysVar.Hopper[SysVar.Tube[k].Deroute-1].Fill;
+								else *(unaligned_ushort *)strpointer=0;
+							}
+							else *(unaligned_ushort*)strpointer=MDB_Changer1.TubeStatus[s];
+						}
+						else *(unaligned_ushort*)strpointer=MDB_Changer1.TubeStatus[s];
+						
+						strpointer+=2;									
+					}				
+					
+					if (MDB_Changer1.Problem==6) // cassette removed
+					     *(unsigned char *)strpointer++=1;
+					else *(unsigned char *)strpointer++=0;
+										
+					addMessage(ICOM_MESSAGE_COIN_STATUS, MDB_MAXCOINS*2+1, &str[0]);
+				}
+                break;
+            case EvTypeMDB_ChangerDispenseInfo:
+                break;
+            case EvTypeMDB_ChangerExpandedPayout:
+                break;
+
+            case EvTypeMDB_TubesNewFillStatus:
                 break;
             
             case EvTypeMDB_CoinInTube:
@@ -484,41 +535,119 @@ int main()
                 printf("Coin %d in Tube - channel %d \n",coinval,ev.Data[5]);
                 addMessage(ICOM_MESSAGE_COIN_ACCEPTED,7,&ev.Data[0]);
                 break;
-
             case EvTypeMDB_CoinInCashbox:
                 coinval=(ev.Data[1] + ev.Data[2]*256);
                 printf("Coin %d in Cashbox - channel %d \n",coinval,ev.Data[5]);
                 addMessage(ICOM_MESSAGE_COIN_ACCEPTED,7,&ev.Data[0]);
                 break;
-
             case EvTypeMDB_CoinDispensedManually:
                 coinval=(ev.Data[1] + ev.Data[2]*256);
                 printf("Coin %d in Cashbox - channel %d \n",coinval,ev.Data[5]);
                 addMessage(ICOM_MESSAGE_COIN_DISPENSED,7,&ev.Data[0]);
                 break;
-
-            case EvTypeMDB_ChangerLost:
-                printf("Changer %02X lost\n", ev.Data[0]);
+            case EvTypeMDB_CoinRejected:
                 break;
+
+            case EvTypeMDB_ValidatorStatus:
+                break;
+            case EvTypeMDB_ValidatorLost:
+                break;
+
 
             case EvTypeMDB_BillStacked:
                 noteval=(ev.Data[1] + ev.Data[2]*0x100 + ev.Data[3]*0x10000 + ev.Data[4]*0x1000000);
-                printf("Bill %d accepted - channel %d \n",coinval,ev.Data[7]);
+                printf("Bill %d accepted - channel %d \n",noteval,ev.Data[7]);
                 addMessage(ICOM_MESSAGE_BILL_ACCEPTED,8,&ev.Data[0]);
                 break;
 
             case EvTypeMDB_BillInEscrow:
                 noteval=(ev.Data[1] + ev.Data[2]*0x100 + ev.Data[3]*0x10000 + ev.Data[4]*0x1000000);
-                printf("Bill %d in escrow - channel %d \n",coinval,ev.Data[6]);                
+                printf("Bill %d in escrow - channel %d \n",noteval,ev.Data[6]);                
                 break;
 
             case EvTypeMDB_BillRejected:
             case EvTypeMDB_BillReturned:
                 noteval=(ev.Data[1] + ev.Data[2]*0x100 + ev.Data[3]*0x10000 + ev.Data[4]*0x1000000);
-                printf("Bill %d rejected - channel %d \n",coinval,ev.Data[7]);
+                printf("Bill %d rejected - channel %d \n",noteval,ev.Data[7]);
                 addMessage(ICOM_MESSAGE_BILL_REJECTED,8,&ev.Data[0]);
                 break;
+            case EvTypeMDB_BillStackedManually:
+                addMessage(ICOM_MESSAGE_BILL_STACKED,7,&ev.Data[0]);
+                break;
+            case EvTypeMDB_BillEscrowTimeout:
+                break;
 
+            case EvTypeMDB_CardreaderReady:
+                printf("CardReader ready \n");
+                addMessage(ICOM_MESSAGE_CARDREADER_READY,0,&ev.Data[0]);
+                break;
+            case EvTypeMDB_CardreaderVendApproved:
+                noteval=(ev.Data[1] + ev.Data[2]*0x100 + ev.Data[3]*0x10000 + ev.Data[4]*0x1000000);
+                printf("CardReader amount %d approved!\n",noteval);
+                addMessage(ICOM_MESSAGE_CARDREADER_ACCEPTED,5,&ev.Data[0]);
+                break;
+            case EvTypeMDB_CardreaderVendDenied:
+                printf("CardReader amount %d denied!\n",noteval);
+                addMessage(ICOM_MESSAGE_CARDREADER_DENIED,5,&ev.Data[0]);
+                break;
+            case EvTypeMDB_CardreaderDisplay:
+                addMessage(ICOM_MESSAGE_CARDREADER_DISPLAY,strlen(ev.Data),&ev.Data[0]);
+                break;
+            case EvTypeMDB_CardreaderFunds:            
+                addMessage(ICOM_MESSAGE_CARDREADER_FUNDS,9,&ev.Data[1]);
+                break;
+            case EvTypeMDB_CardreaderLost:
+            case EvTypeMDB_CardreaderError:
+                addMessage(ICOM_MESSAGE_CARDREADER_ERROR,1,&ev.Data[1]);
+                break;
+            case EvTypeMDB_CardreaderAgeVerificationStatus:
+                break;
+
+            case EvTypeMDB_AVDLost:
+                break;
+
+            case EvTypeMDB_ParkIOLost:
+                break;
+
+            case EvTypeMDB_HopperInserted:
+                addMessage(ICOM_MESSAGE_HOPPER_INSERTED,1,&ev.Data[1]);
+                break;
+            case EvTypeMDB_HopperStatusChanged:
+				for (int s=0;s<MAX_HOPPER;s++)				
+				{
+					if (SysVar.Hopper[s].Blocked)
+						 str[s]=(SysVar.Hopper[s].Status | 0x80);
+					else str[s]=SysVar.Hopper[s].Status;
+				}				
+				addMessage(ICOM_MESSAGE_HOPPER_STATUS, MAX_HOPPER, &str[0]);
+                break;
+            case EvTypeMDB_HopperCounted:
+
+                SysVar.Hopper[ev.Data[1]].Fill = ((uint16_t)ev.Data[2]<<8) + ev.Data[3];
+                SysVar.Hopper[ev.Data[1]].LastFill = ((uint16_t)ev.Data[2]<<8) + ev.Data[3];
+                SysVar.Hopper[ev.Data[1]].Ready = 1;
+                
+                CalcCoinCRC(true,200);
+
+                addMessage(ICOM_MESSAGE_HOPPER_CLEARED,3,&ev.Data[1]);
+                break;
+            case EvTypeMDB_HopperRemoved:
+                addMessage(ICOM_MESSAGE_HOPPER_REMOVED,1,&ev.Data[1]);
+                break;
+            case EvTypeMDB_HopperPaidOut:
+                addMessage(ICOM_MESSAGE_HOPPER_DISPENSED,2,&ev.Data[1]);
+                break;
+            case EvTypeMDB_HopperTimeout:
+                addMessage(ICOM_MESSAGE_PAYOUT_ERROR, 2, &ev.Data[1]);
+                            
+                SysVar.Hopper[ev.Data[2]].Fill+=ev.Data[1];	//nicht ausgegebene Muenzen wieder auf Bestand !
+                SysVar.Hopper[ev.Data[2]].LastFill+=ev.Data[1];
+        
+                printf("Hopper %s konnte %02u M�nzen nicht ausgeben!\n",ev.Data[2],ev.Data[1]);
+                
+                CalcCoinCRC(true,201);
+
+                break;
 
             default:
                 printf("MDB Event %d Length %d\n", ev.Type, ev.Length);

@@ -232,7 +232,7 @@ typedef struct
 	unsigned long ChangerAmount;
 	unsigned char PhysTubes[16];
 	unsigned int  AKZ_Max;
-	unsigned char ready,DiagnosticCommand,SetTubes;
+	unsigned char ready,DiagnosticCommand,SetTubes,TubesRead,available;
 	
 	unsigned char TubeCountAF[6];				// ab Currenza V1.11
 	unsigned char CoinTypeAF[6];				// ab Currenza V1.11

@@ -263,6 +263,8 @@ void InitChanger1()
 	for (s=0;s<2;s++) MDB_Changer1.HopperCount[s]=0xFFFF;
 	
 	MDB_Changer1.SetTubes=0;
+	MDB_Changer1.TubesRead=0;
+	MDB_Changer1.available=110;
 	
 	MDB_Changer1.CoinToMain=0x0000;
 	
@@ -1072,6 +1074,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 			}						
 		}
 
+
 		if (diff) 
 		{
 			MDBEvent.Type    = EvTypeMDB_ChangerTubeStatusChanged;
@@ -1269,6 +1272,7 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 	      					//0x0B = Changer was Reset
 		             		MDB_Changer->NextRequest=CmdChanger_Status;
 		             		MDB_Changer->Sequence=Changer_Sequence_INIT;
+							MDB_Changer1.TubesRead=0;
 		    			}
 	            		
 	      				//0x01 = Escrow Request
@@ -1741,7 +1745,9 @@ void RX_Handle_Changer(ChangerTag *MDB_Changer, unsigned char buff_point)
 						else SysVar.Tube[h].avail=1;
 					}
 				}
-				
+
+				MDB_Changer1.TubesRead=1;
+
 				MDBEvent.Type    = EvTypeMDB_TubesNewFillStatus;
 				MDBEvent.Length  = 2;
 				MDBEvent.Data[0] = 0x24;
@@ -2811,7 +2817,12 @@ void handleMDBtimer(void)
 	     {
 	       case 0 :		//Changer1 or EMP
 		 	 #if (TUBE_CHANGER==1)
-                if(MDB_Changer1.ResetTime==0) TX_Handle_Changer(pMDB_Changer1,MDB_Adr_Changer1);
+                if(MDB_Changer1.ResetTime==0) {
+					TX_Handle_Changer(pMDB_Changer1,MDB_Adr_Changer1);
+					if (MDB_Changer1.available) {
+						if (--MDB_Changer1.available == 0) MDB_Changer1.TubesRead = 1;
+					}
+				}
 	         #elif (WH_EMP==1)
 	         	if(MDB_Emp.ResetTime==0) TX_Handle_Emp(MDB_Adr_Emp);
              #endif                                  
@@ -3168,7 +3179,9 @@ void TX_Handle_Cardreader(unsigned int adr)
       	if(MDB_Cardreader.DevLost==0)
       	{
   			MDBEvent.Type    = EvTypeMDB_CardreaderLost;			// MDBEvent
-  			MDBEvent.Length  = 0;
+  			MDBEvent.Length  = 2;
+			MDBEvent.Data[0] = 0x12;
+			MDBEvent.Data[1] = 0x10;
   			putMDBevent(&MDBEvent);
 
 	  		InitCardreader();

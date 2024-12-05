@@ -376,7 +376,7 @@ static void udp_intercom_received(void *passed_data, struct udp_pcb *upcb, struc
 					else *(unaligned_ushort *)(txpointer-4) = 0xFFFF;
 				break;
 				case ICOM_COMMAND_COIN_STATUS:
-					if (!crc_error) 
+					if (!crc_error && MDB_Changer1.TubesRead) 
 					{				
 						for (s=0;s<MDB_MAXCOINS;s++) 
 						{
